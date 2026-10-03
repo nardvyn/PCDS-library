@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { googleLogout } from '@react-oauth/google'
 import { Bell, BookOpen, BookOpenCheck, CalendarDays, ChevronRight, Clock3, History, LayoutDashboard, Library, LogOut, Menu, Search, UserRound, X } from 'lucide-react'
 
 import api from '../services/api'
@@ -65,9 +66,10 @@ function DashboardPage() {
   }
   function handleSignOut() {
     if (!window.confirm('Are you sure you want to sign out?')) return
+    googleLogout()
     localStorage.removeItem('access_token')
     localStorage.removeItem('user')
-    navigate('/')
+    navigate('/', { replace: true })
   }
 
   const navItems = [
