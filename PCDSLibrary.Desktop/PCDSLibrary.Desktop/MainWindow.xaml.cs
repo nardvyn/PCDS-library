@@ -48,7 +48,7 @@ namespace PCDSLibrary.Desktop
             if (string.IsNullOrWhiteSpace(email))
             {
                 ErrorText.Text =
-                    "Please enter your staff email.";
+                    "Please enter your staff email or ID.";
 
                 StaffEmailInput.Focus();
                 return;

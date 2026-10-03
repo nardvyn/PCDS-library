@@ -107,8 +107,8 @@
                            Foreground="#687B86"
                            Text="For administrators and librarians only"/>
 
-                <!-- Staff email -->
-                <TextBlock Text="Staff email"
+                <!-- Staff email or ID -->
+                <TextBlock Text="Staff email or ID"
                            FontSize="13"
                            FontWeight="SemiBold"
                            Foreground="#172630"/>

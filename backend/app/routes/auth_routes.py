@@ -325,16 +325,19 @@ def staff_register():
 @auth_bp.post("/login")
 def login():
     data = request.get_json(silent=True) or {}
-    email = str(data.get("email", "")).strip().lower()
+    identifier = str(data.get("email", data.get("identifier", ""))).strip()
+    email = identifier.lower()
     password = str(data.get("password", ""))
 
-    if not email or not password:
+    if not identifier or not password:
         return jsonify({
             "success": False,
-            "message": "Email and password are required.",
+            "message": "Staff email or ID and password are required.",
         }), 400
 
     user = User.query.filter_by(email=email).first()
+    if not user:
+        user = User.query.filter_by(school_id=identifier).first()
     if user and not user.password_hash and user.google_id:
         return jsonify({
             "success": False,
