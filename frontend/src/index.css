@@ -1,0 +1,3 @@
+html { min-width: 320px; background: #fbfcf8; }
+body { min-width: 320px; }
+button, input { touch-action: manipulation; }

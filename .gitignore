@@ -1,0 +1,41 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Python environments and generated files
+**/venv*/
+**/.venv*/
+**/__pycache__/
+*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Local databases and logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Node dependencies and build output
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/coverage/
+
+# .NET build output and user-specific settings
+**/.vs/
+**/bin/
+**/obj/
+**/artifacts/
+**/*.user
+**/*.suo
+
+# Private uploaded files
+backend/app/uploads/*
+!backend/app/uploads/.gitkeep
+
+# OS-generated files
+.DS_Store
+Thumbs.db
