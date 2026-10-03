@@ -14,6 +14,7 @@ from werkzeug.utils import secure_filename
 from pathlib import Path
 from hmac import compare_digest
 from uuid import uuid4
+from sqlalchemy import func
 
 from app.extensions import db
 from app.models.user import User
@@ -337,7 +338,7 @@ def login():
 
     user = User.query.filter_by(email=email).first()
     if not user:
-        user = User.query.filter_by(school_id=identifier).first()
+        user = User.query.filter(func.lower(User.school_id) == identifier.lower()).first()
     if user and not user.password_hash and user.google_id:
         return jsonify({
             "success": False,
