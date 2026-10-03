@@ -18,6 +18,18 @@ class Config:
 	MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "")
 	MAIL_USE_TLS = os.getenv("MAIL_USE_TLS", "true").lower() == "true"
 	MAIL_USE_SSL = os.getenv("MAIL_USE_SSL", "false").lower() == "true"
+	CORS_ORIGINS = [
+		origin.strip()
+		for origin in (
+			os.getenv("CORS_ORIGINS", "").split(",")
+			+ [
+				"https://pcds-library.vercel.app",
+				"http://localhost:5173",
+				"http://127.0.0.1:5173",
+			]
+		)
+		if origin.strip()
+	]
 	FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 	UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "app", "uploads", "school_ids")
 	MAX_CONTENT_LENGTH = 5 * 1024 * 1024
