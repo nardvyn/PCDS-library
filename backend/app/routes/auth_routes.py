@@ -128,7 +128,12 @@ def google_login():
         user.email = email
         user.profile_picture = claims.get("picture") or user.profile_picture
         db.session.commit()
-        profile_required = user.borrower_profile is None or user.borrower_profile.verification_status != "VERIFIED"
+        profile = user.borrower_profile
+        profile_required = (
+            profile is None
+            or not profile.school_id_number
+            or not profile.school_id_image
+        )
 
     return jsonify({"success": True, "access_token": issue_token(user), "user": user.to_dict(), "profile_required": profile_required}), 200
 
