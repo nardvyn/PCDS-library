@@ -15,6 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description="Create a PCDS Library desktop staff account.")
     parser.add_argument("--school-id", help="Unique staff ID used at desktop login")
     parser.add_argument("--email", help="Email used at desktop login")
+    parser.add_argument("--new-email", help="New email for an existing account during password reset")
     parser.add_argument("--name", help="Staff full name")
     parser.add_argument("--role", choices=sorted(VALID_ROLES), help="Desktop access role")
     parser.add_argument("--reset-password", action="store_true", help="Update the password of an existing staff account")
@@ -22,6 +23,8 @@ def main():
 
     if args.reset_password and not (args.school_id or args.email):
         parser.error("Provide --school-id or --email to identify the existing account.")
+    if args.new_email and not args.reset_password:
+        parser.error("--new-email can only be used with --reset-password.")
     if not args.reset_password and not all((args.school_id, args.email, args.name, args.role)):
         parser.error("--school-id, --email, --name, and --role are required when creating an account.")
 
@@ -41,7 +44,7 @@ def main():
                 else None
             )
             staff_by_email = (
-                User.query.filter_by(email=args.email.strip().lower()).first()
+                User.query.filter(func.lower(User.email) == args.email.strip().lower()).first()
                 if args.email
                 else None
             )
@@ -52,9 +55,16 @@ def main():
                 parser.error("No existing staff account matched. No account was created.")
             if existing_staff.role not in VALID_ROLES:
                 parser.error("Only ADMIN and LIBRARIAN accounts can be updated by this command.")
+            if args.new_email:
+                new_email = args.new_email.strip().lower()
+                email_owner = User.query.filter(func.lower(User.email) == new_email).first()
+                if email_owner and email_owner.user_id != existing_staff.user_id:
+                    parser.error("That email is already assigned to another account. No changes were made.")
+                existing_staff.email = new_email
             existing_staff.set_password(password)
             db.session.commit()
-            print(f"Updated password for existing {existing_staff.role} account.")
+            updated = "email and password" if args.new_email else "password"
+            print(f"Updated {updated} for existing {existing_staff.role} account.")
             return
 
         existing_staff = User.query.filter(func.lower(User.school_id) == args.school_id.strip().lower()).first()
