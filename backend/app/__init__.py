@@ -52,6 +52,20 @@ def create_app():
 			"database_test": "/api/database/test",
 		}, 200
 
+	@app.get("/api")
+	def api_root():
+		return {
+			"success": True,
+			"message": "PCDS Library API is running",
+			"routes": {
+				"health": "/api/health",
+				"database_test": "/api/database/test",
+				"auth": "/api/auth",
+				"books": "/api/books",
+				"borrow_requests": "/api/borrow-requests",
+			},
+		}, 200
+
 	@app.get("/api/health")
 	def health():
 		return {

@@ -94,7 +94,7 @@ function DashboardPage() {
         {activeSection === 'requests' && <RequestsSection summary={summary} onNavigate={navigateTo} />}
         {activeSection === 'history' && <HistorySection summary={summary} />}
         {activeSection === 'notifications' && <NotificationsSection onUnreadCountChange={updateUnreadNotifications} />}
-        {activeSection === 'profile' && <ProfileSection user={user} borrowingPeriod={borrowingPeriod} />}
+        {activeSection === 'profile' && <ProfileSection user={user} summary={summary} borrowingPeriod={borrowingPeriod} onProfileUpdated={loadDashboard} />}
       </main>
     </div>
   )
@@ -290,7 +290,62 @@ function NotificationsSection({ onUnreadCountChange }) {
   const unreadCount = notifications.filter((item) => !item.is_read).length
   return <><SectionHeader title="Notifications" description="Account verification and borrowing updates." icon={<Bell size={24} />} /><div className="notifications-summary">{unreadCount} unread</div>{error && <div className="catalog-message" role="alert">{error}</div>}{loading ? <div className="dashboard-panel section-placeholder"><DashboardLoading /></div> : notifications.length === 0 ? <div className="dashboard-panel section-placeholder"><Bell size={34} /><h3>You're all caught up</h3><p>Verification and borrowing updates will appear here.</p></div> : <div className="notifications-list">{notifications.map((notification) => <article className={`notification-item ${notification.is_read ? 'read' : 'unread'}`} key={notification.notification_id}><div className="notification-item-mark"><Bell size={18} /></div><div className="notification-item-content"><h3>{notification.title}</h3><p>{notification.message}</p><time>{new Date(notification.created_at).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}</time></div>{!notification.is_read && <button className="mark-read-button" onClick={() => markRead(notification.notification_id)}>Mark read</button>}</article>)}</div>}</>
 }
-function ProfileSection({ user, borrowingPeriod }) { return <><SectionHeader title="My Profile" description="View your library account information." icon={<UserRound size={24} />} /><div className="dashboard-panel profile-panel"><AccountRow label="Full name" value={user.full_name || 'Library User'} /><AccountRow label="Account status" value={user.account_status || 'ACTIVE'} valueClass="active-status" /><AccountRow label="Role" value={user.role || 'STUDENT'} /><AccountRow label="School ID" value={user.school_id || 'Not available'} /><AccountRow label="Phone number" value={user.contact_number || 'Not available'} /><AccountRow label="Borrowing period" value={`${borrowingPeriod} days`} /></div></> }
+function ProfileSection({ user, summary, borrowingPeriod, onProfileUpdated }) {
+  const [schoolIdFile, setSchoolIdFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [message, setMessage] = useState(null)
+  const canReplaceSchoolId = ['STUDENT', 'TEACHER'].includes(user.role) && !summary.school_id_image_available
+
+  async function handleSchoolIdUpload(event) {
+    event.preventDefault()
+    if (!schoolIdFile) {
+      setMessage({ type: 'error', text: 'Choose a JPG, PNG, or WebP School ID photo first.' })
+      return
+    }
+
+    const form = event.currentTarget
+    const formData = new FormData()
+    formData.append('school_id', schoolIdFile)
+    setUploading(true)
+    setMessage(null)
+    try {
+      const { data } = await api.post('/auth/profile/school-id', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setSchoolIdFile(null)
+      form.reset()
+      setMessage({ type: 'success', text: data.message })
+      await onProfileUpdated()
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Unable to upload your School ID photo. Please try again.' })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return <>
+    <SectionHeader title="My Profile" description="View your library account information." icon={<UserRound size={24} />} />
+    <div className="dashboard-panel profile-panel">
+      <AccountRow label="Full name" value={user.full_name || 'Library User'} />
+      <AccountRow label="Account status" value={user.account_status || 'ACTIVE'} valueClass="active-status" />
+      <AccountRow label="Role" value={user.role || 'STUDENT'} />
+      <AccountRow label="School ID" value={user.school_id || 'Not available'} />
+      <AccountRow label="Phone number" value={user.contact_number || 'Not available'} />
+      <AccountRow label="Verification" value={summary.verification_status || 'PENDING_VERIFICATION'} />
+      <AccountRow label="Borrowing period" value={`${borrowingPeriod} days`} />
+    </div>
+    {canReplaceSchoolId && <section className="dashboard-panel school-id-reupload">
+      <h3>School ID photo unavailable</h3>
+      <p>Your profile was submitted, but the library cannot access its School ID photo. Upload it again so an administrator can review your account.</p>
+      {message && <div className={`catalog-message ${message.type}`} role={message.type === 'error' ? 'alert' : 'status'}>{message.text}</div>}
+      <form onSubmit={handleSchoolIdUpload}>
+        <label htmlFor="replace-school-id">Choose School ID photo (JPG, PNG, or WebP; max 5 MB)</label>
+        <input id="replace-school-id" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setSchoolIdFile(event.target.files?.[0] || null)} required />
+        <button className="request-book-button school-id-upload-button" type="submit" disabled={uploading || !schoolIdFile}>{uploading ? 'Uploading...' : 'Upload School ID photo'}</button>
+      </form>
+    </section>}
+  </>
+}
 
 function SummaryCard({ icon, label, value, color, onClick }) { return <button className="summary-card" onClick={onClick}><div className={`summary-icon ${color}`}>{icon}</div><div><span>{label}</span><strong>{value}</strong></div><ChevronRight size={18} className="summary-arrow" /></button> }
 function AccountRow({ label, value, valueClass = '' }) { return <div className="account-row"><span>{label}</span><strong className={valueClass}>{value}</strong></div> }

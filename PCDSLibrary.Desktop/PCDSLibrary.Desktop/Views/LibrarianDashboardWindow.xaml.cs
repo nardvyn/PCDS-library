@@ -694,10 +694,12 @@ namespace PCDSLibrary.Desktop.Views
                 details.Children.Add(new TextBlock { Text = $"Phone: {profile.ContactNumber}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
             if (!string.IsNullOrWhiteSpace(profile.Address))
                 details.Children.Add(new TextBlock { Text = $"Address: {profile.Address}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
+            if (profile.Role is "STUDENT" or "TEACHER" && !profile.SchoolIdImageAvailable)
+                details.Children.Add(new TextBlock { Text = "School ID image unavailable. Ask the borrower to resubmit their profile.", Margin = new Thickness(0, 5, 0, 0), FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A6533D")), TextWrapping = TextWrapping.Wrap });
             details.Children.Add(new TextBlock { Text = $"Registered: {FormatRequestDate(profile.CreatedAt ?? "")}", Margin = new Thickness(0, 3, 0, 0), FontSize = 10, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A9AA4")) });
             grid.Children.Add(details);
             var actions = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
-            if (profile.ProfileId.HasValue && !string.IsNullOrWhiteSpace(profile.SchoolIdImage))
+            if (profile.ProfileId.HasValue && profile.SchoolIdImageAvailable)
             {
                 var viewButton = CreateRequestButton("View ID", "#15577F");
                 viewButton.Tag = profile.ProfileId.Value;
@@ -706,7 +708,7 @@ namespace PCDSLibrary.Desktop.Views
             }
             if (profile.ProfileId.HasValue && (profile.Role == "STUDENT" || profile.Role == "TEACHER"))
             {
-                if (profile.VerificationStatus is "PENDING_VERIFICATION" or "REJECTED" or "SUSPENDED")
+                if (profile.ProfileComplete && profile.VerificationStatus is "PENDING_VERIFICATION" or "REJECTED" or "SUSPENDED")
                     AddVerificationAction(actions, "Verify", "VERIFIED", "#24734C", profile, list);
                 if (profile.VerificationStatus == "PENDING_VERIFICATION")
                     AddVerificationAction(actions, "Reject", "REJECTED", "#A6533D", profile, list);

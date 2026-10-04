@@ -18,6 +18,19 @@ def is_admin():
     return get_jwt().get("role") == "ADMIN"
 
 
+def borrower_profile_is_complete(profile, role):
+    required_fields = (
+        profile
+        and profile.school_id_number
+        and profile.contact_number
+        and (all((profile.course, profile.year_level, profile.section)) if role == "STUDENT" else profile.department)
+    )
+    if not required_fields or not profile.school_id_image:
+        return False
+    image_path = Path(current_app.config["UPLOAD_FOLDER"]) / profile.school_id_image
+    return image_path.is_file()
+
+
 @verification_bp.get("/profiles")
 @jwt_required()
 def list_profiles():
@@ -27,16 +40,6 @@ def list_profiles():
     profiles = []
     for user in users:
         profile = user.borrower_profile
-        if user.role in {"STUDENT", "TEACHER"}:
-            profile_is_complete = bool(
-                profile
-                and profile.school_id_number
-                and profile.contact_number
-                and profile.school_id_image
-                and (all((profile.course, profile.year_level, profile.section)) if user.role == "STUDENT" else profile.department)
-            )
-            if not profile_is_complete:
-                continue
         profile_data = profile.to_dict() if profile else {
             "profile_id": None,
             "school_id_number": user.school_id,
@@ -60,6 +63,12 @@ def list_profiles():
             "role": user.role,
             "account_status": user.account_status,
             "created_at": user.created_at.isoformat() if user.created_at else None,
+            "profile_complete": borrower_profile_is_complete(profile, user.role) if user.role in {"STUDENT", "TEACHER"} else False,
+            "school_id_image_available": bool(
+                profile
+                and profile.school_id_image
+                and (Path(current_app.config["UPLOAD_FOLDER"]) / profile.school_id_image).is_file()
+            ),
         })
     return jsonify({"success": True, "profiles": profiles}), 200
 
@@ -75,6 +84,11 @@ def update_profile_status(profile_id):
     status = str((request.get_json(silent=True) or {}).get("status", "")).upper()
     if status not in {"VERIFIED", "REJECTED", "SUSPENDED"}:
         return jsonify({"success": False, "message": "Invalid verification status."}), 400
+    if status == "VERIFIED" and not borrower_profile_is_complete(profile, profile.user.role):
+        return jsonify({
+            "success": False,
+            "message": "The borrower profile is incomplete or its School ID image is unavailable. Ask the borrower to resubmit the profile before verifying.",
+        }), 409
     profile.verification_status = status
     profile.verified_by = int(get_jwt_identity())
     profile.verified_at = datetime.now(timezone.utc)

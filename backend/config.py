@@ -18,6 +18,7 @@ class Config:
 	MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "")
 	MAIL_USE_TLS = os.getenv("MAIL_USE_TLS", "true").lower() == "true"
 	MAIL_USE_SSL = os.getenv("MAIL_USE_SSL", "false").lower() == "true"
+	FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 	CORS_ORIGINS = [
 		origin.strip()
 		for origin in (
@@ -30,6 +31,8 @@ class Config:
 		)
 		if origin.strip()
 	]
-	FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
-	UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "app", "uploads", "school_ids")
+	UPLOAD_FOLDER = os.getenv(
+		"UPLOAD_FOLDER",
+		os.path.join(os.path.dirname(__file__), "app", "uploads", "school_ids"),
+	)
 	MAX_CONTENT_LENGTH = 5 * 1024 * 1024

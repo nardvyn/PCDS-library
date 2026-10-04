@@ -13,11 +13,19 @@ namespace PCDSLibrary.Desktop.Services
 
         public ApiService(string accessToken = "")
         {
+            var apiBaseUrl = Environment.GetEnvironmentVariable("PCDS_LIBRARY_API_URL");
+            if (string.IsNullOrWhiteSpace(apiBaseUrl))
+            {
+                apiBaseUrl = "https://pcds-library-production.up.railway.app/api/";
+            }
+            else if (!apiBaseUrl.EndsWith('/'))
+            {
+                apiBaseUrl += "/";
+            }
+
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri(
-                    "http://127.0.0.1:5000/api/"
-                )
+                BaseAddress = new Uri(apiBaseUrl, UriKind.Absolute)
             };
 
             if (!string.IsNullOrWhiteSpace(accessToken))

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, current_app, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app.extensions import db
@@ -30,6 +31,11 @@ def borrower_dashboard():
     overdue_books = Loan.query.filter(Loan.user_id == user_id, Loan.status == "ACTIVE", Loan.due_date < now).count()
     unread_notifications = Notification.query.filter_by(user_id=user_id, is_read=False).count()
     profile = user.borrower_profile
+    school_id_image_available = bool(
+        profile
+        and profile.school_id_image
+        and (Path(current_app.config["UPLOAD_FOLDER"]) / profile.school_id_image).is_file()
+    )
     settings = {row.setting_key: row.setting_value for row in LibrarySetting.query.all()}
     default_loan_days = 14 if user.role == "TEACHER" else 7
     borrowing_period = int(settings.get("teacher_loan_days" if user.role == "TEACHER" else "student_loan_days", default_loan_days))
@@ -43,6 +49,7 @@ def borrower_dashboard():
         "returned_books": len(returned_loans),
         "unread_notifications": unread_notifications,
         "verification_status": profile.verification_status if profile else "PENDING_VERIFICATION",
+        "school_id_image_available": school_id_image_available,
         "borrowing_period": borrowing_period,
         "daily_penalty": daily_penalty,
         "active_loans": [loan.to_dict() for loan in active_loans],

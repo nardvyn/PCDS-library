@@ -76,6 +76,19 @@ def issue_token(user):
     )
 
 
+def borrower_profile_needs_completion(user):
+    if user.role not in {"STUDENT", "TEACHER"}:
+        return False
+    profile = user.borrower_profile
+    if not profile or not profile.school_id_number or not profile.contact_number or not profile.school_id_image:
+        return True
+    if user.role == "STUDENT" and not all((profile.course, profile.year_level, profile.section)):
+        return True
+    if user.role == "TEACHER" and not profile.department:
+        return True
+    return False
+
+
 @auth_bp.post("/google")
 def google_login():
     credential = str((request.get_json(silent=True) or {}).get("credential", ""))
@@ -128,12 +141,7 @@ def google_login():
         user.email = email
         user.profile_picture = claims.get("picture") or user.profile_picture
         db.session.commit()
-        profile = user.borrower_profile
-        profile_required = (
-            profile is None
-            or not profile.school_id_number
-            or not profile.school_id_image
-        )
+        profile_required = borrower_profile_needs_completion(user)
 
     return jsonify({"success": True, "access_token": issue_token(user), "user": user.to_dict(), "profile_required": profile_required}), 200
 
@@ -214,19 +222,45 @@ def upload_school_id():
     image = request.files.get("school_id")
     if not user or not image or not image.filename:
         return jsonify({"success": False, "message": "A School ID image is required."}), 400
+    if user.role not in {"STUDENT", "TEACHER"}:
+        return jsonify({"success": False, "message": "Only borrower accounts can upload a School ID image."}), 403
+    profile = user.borrower_profile
+    profile_fields = (
+        profile
+        and profile.school_id_number
+        and profile.contact_number
+        and (
+            all((profile.course, profile.year_level, profile.section))
+            if user.role == "STUDENT"
+            else profile.department
+        )
+    )
+    if not profile_fields:
+        return jsonify({"success": False, "message": "Complete your profile before replacing its School ID image."}), 409
     extension = Path(image.filename).suffix.lower()
     if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
         return jsonify({"success": False, "message": "Only JPG, PNG, and WebP images are allowed."}), 400
-    filename = f"{user.user_id}-{uuid4().hex}{extension}"
+    filename = secure_filename(f"{user.user_id}-{uuid4().hex}{extension}")
     upload_folder = Path(current_app.config["UPLOAD_FOLDER"])
     upload_folder.mkdir(parents=True, exist_ok=True)
-    image.save(upload_folder / secure_filename(filename))
-    profile = user.borrower_profile or BorrowerProfile(user_id=user.user_id)
+    image_path = upload_folder / filename
+    image.save(image_path)
+    previous_image = profile.school_id_image
     profile.school_id_image = filename
-    if not user.borrower_profile:
-        db.session.add(profile)
-    db.session.commit()
-    return jsonify({"success": True, "message": "School ID uploaded securely.", "profile": profile.to_dict()}), 200
+    profile.verification_status = "PENDING_VERIFICATION"
+    profile.verified_by = None
+    profile.verified_at = None
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        image_path.unlink(missing_ok=True)
+        current_app.logger.exception("Unable to save a replacement School ID image for user %s.", user.user_id)
+        return jsonify({"success": False, "message": "Unable to save the School ID image. Please try again."}), 500
+
+    if previous_image and previous_image != filename:
+        (upload_folder / previous_image).unlink(missing_ok=True)
+    return jsonify({"success": True, "message": "School ID image uploaded. Your profile is awaiting administrator verification.", "profile": profile.to_dict()}), 200
 
 
 @auth_bp.post("/register")
@@ -370,12 +404,13 @@ def login():
             "email": user.email,
         },
     )
+    profile_required = borrower_profile_needs_completion(user)
     return jsonify({
         "success": True,
         "message": "Login successful.",
         "access_token": access_token,
         "user": user.to_dict(),
-        "next_page": "/dashboard" if user.borrower_profile and user.borrower_profile.verification_status == "VERIFIED" else "/dashboard",
+        "next_page": "/complete-profile" if profile_required else "/dashboard",
     }), 200
 
 

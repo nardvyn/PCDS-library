@@ -70,6 +70,12 @@ namespace PCDSLibrary.Desktop.Models
         [JsonPropertyName("school_id_image")]
         public string? SchoolIdImage { get; set; }
 
+        [JsonPropertyName("profile_complete")]
+        public bool ProfileComplete { get; set; }
+
+        [JsonPropertyName("school_id_image_available")]
+        public bool SchoolIdImageAvailable { get; set; }
+
         [JsonPropertyName("created_at")]
         public string? CreatedAt { get; set; }
     }
