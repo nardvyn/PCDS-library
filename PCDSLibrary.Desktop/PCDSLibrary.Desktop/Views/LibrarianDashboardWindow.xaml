@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:PCDSLibrary.Desktop.Views"
         Title="PCDS Library - Dashboard"
-        Icon="/Assets/pcds-seal.png"
+        Icon="/Assets/pcds-library-icon.ico"
         Width="1320"
         Height="700"
         MinWidth="1050"

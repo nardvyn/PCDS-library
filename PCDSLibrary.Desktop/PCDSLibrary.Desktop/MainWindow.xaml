@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:PCDSLibrary.Desktop.Views"
         Title="PCDS Library"
-        Icon="/Assets/pcds-seal.png"
+        Icon="/Assets/pcds-library-icon.ico"
         Width="1080"
         Height="720"
         MinWidth="860"
@@ -91,6 +91,7 @@
                                      Height="48"
                                      Margin="0,0,0,19"
                                      Padding="13,11"
+                                     Foreground="#12363D"
                                      FontSize="14"
                                      AutomationProperties.Name="Staff email or ID"
                                      KeyDown="StaffEmailInput_KeyDown"/>
@@ -100,6 +101,7 @@
                                          Height="48"
                                          Margin="0,0,0,4"
                                          Padding="13,11"
+                                         Foreground="#12363D"
                                          FontSize="14"
                                          AutomationProperties.Name="Password"
                                          KeyDown="PasswordInput_KeyDown"/>
@@ -136,22 +138,22 @@
                                        Foreground="{StaticResource MutedBrush}"/>
 
                             <TextBlock Text="Full name" Margin="0,0,0,5" FontSize="12" FontWeight="SemiBold" Foreground="#31565C"/>
-                            <TextBox x:Name="RegisterNameInput" Height="42" Margin="0,0,0,12" AutomationProperties.Name="Full name"/>
+                            <TextBox x:Name="RegisterNameInput" Height="42" Margin="0,0,0,12" Foreground="#12363D" AutomationProperties.Name="Full name"/>
 
                             <TextBlock Text="Staff ID" Margin="0,0,0,5" FontSize="12" FontWeight="SemiBold" Foreground="#31565C"/>
-                            <TextBox x:Name="RegisterStaffIdInput" Height="42" Margin="0,0,0,12" AutomationProperties.Name="Staff ID"/>
+                            <TextBox x:Name="RegisterStaffIdInput" Height="42" Margin="0,0,0,12" Foreground="#12363D" AutomationProperties.Name="Staff ID"/>
 
                             <TextBlock Text="Work email" Margin="0,0,0,5" FontSize="12" FontWeight="SemiBold" Foreground="#31565C"/>
-                            <TextBox x:Name="RegisterEmailInput" Height="42" Margin="0,0,0,12" AutomationProperties.Name="Work email"/>
+                            <TextBox x:Name="RegisterEmailInput" Height="42" Margin="0,0,0,12" Foreground="#12363D" AutomationProperties.Name="Work email"/>
 
                             <TextBlock Text="Password (at least 8 characters)" Margin="0,0,0,5" FontSize="12" FontWeight="SemiBold" Foreground="#31565C"/>
-                            <PasswordBox x:Name="RegisterPasswordInput" Height="42" Margin="0,0,0,12" AutomationProperties.Name="Password"/>
+                            <PasswordBox x:Name="RegisterPasswordInput" Height="42" Margin="0,0,0,12" Foreground="#12363D" AutomationProperties.Name="Password"/>
 
                             <TextBlock Text="Confirm password" Margin="0,0,0,5" FontSize="12" FontWeight="SemiBold" Foreground="#31565C"/>
-                            <PasswordBox x:Name="ConfirmPasswordInput" Height="42" Margin="0,0,0,12" AutomationProperties.Name="Confirm password"/>
+                            <PasswordBox x:Name="ConfirmPasswordInput" Height="42" Margin="0,0,0,12" Foreground="#12363D" AutomationProperties.Name="Confirm password"/>
 
                             <TextBlock Text="Staff registration code" Margin="0,0,0,5" FontSize="12" FontWeight="SemiBold" Foreground="#31565C"/>
-                            <PasswordBox x:Name="StaffInviteCodeInput" Height="42" Margin="0,0,0,8" AutomationProperties.Name="Staff registration code"/>
+                            <PasswordBox x:Name="StaffInviteCodeInput" Height="42" Margin="0,0,0,8" Foreground="#12363D" AutomationProperties.Name="Staff registration code"/>
 
                             <TextBlock x:Name="RegistrationErrorText"
                                        MinHeight="24"

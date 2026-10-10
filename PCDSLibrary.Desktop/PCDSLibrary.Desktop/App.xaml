@@ -91,7 +91,7 @@
                                     Width="4"
                                     Margin="0,7,0,7"
                                     HorizontalAlignment="Left"
-                                    Background="{StaticResource AccentBrush}"
+                                    Background="#BDE5E1"
                                     CornerRadius="0,3,3,0"
                                     Visibility="Collapsed"/>
                             <ContentPresenter Margin="{TemplateBinding Padding}"
@@ -101,7 +101,10 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="NavigationSurface" Property="Background" Value="#FFFFFF18"/>
+                                <Setter TargetName="NavigationSurface" Property="Background" Value="#0D7F8C"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="NavigationSurface" Property="Background" Value="#005E6B"/>
                             </Trigger>
                             <Trigger Property="Tag" Value="Active">
                                 <Setter TargetName="NavigationSurface" Property="Background" Value="#0098A6"/>
@@ -109,7 +112,7 @@
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="NavigationSurface" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="NavigationSurface" Property="BorderBrush" Value="#BDE5E1"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45"/>
@@ -130,31 +133,9 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="11,8"/>
             <Setter Property="MinHeight" Value="40"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type TextBox}">
-                        <Border x:Name="InputBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="7"
-                                SnapsToDevicePixels="True">
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                          Margin="{TemplateBinding Padding}"
-                                          HorizontalScrollBarVisibility="Hidden"
-                                          VerticalScrollBarVisibility="Hidden"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="InputBorder" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="InputBorder" Property="Background" Value="{StaticResource CanvasBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="CaretBrush" Value="{StaticResource PrimaryDeepBrush}"/>
+            <Setter Property="SelectionBrush" Value="#80A9DDDA"/>
+            <Setter Property="SelectionTextBrush" Value="{StaticResource InkBrush}"/>
         </Style>
 
         <Style TargetType="{x:Type PasswordBox}">
@@ -166,31 +147,6 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="11,8"/>
             <Setter Property="MinHeight" Value="40"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type PasswordBox}">
-                        <Border x:Name="InputBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="7"
-                                SnapsToDevicePixels="True">
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                          Margin="{TemplateBinding Padding}"
-                                          HorizontalScrollBarVisibility="Hidden"
-                                          VerticalScrollBarVisibility="Hidden"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="InputBorder" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="InputBorder" Property="Background" Value="{StaticResource CanvasBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
         </Style>
 
         <Style TargetType="{x:Type DataGrid}">

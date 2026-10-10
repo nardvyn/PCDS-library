@@ -15,6 +15,7 @@ AppId={{1D0E6E94-5BC5-4CEE-AB44-E26572912B30}
 AppName=PCDS Library Desktop
 AppVersion={#AppVersion}
 AppPublisher=Polytechnic College of Davao del Sur
+SetupIconFile=..\PCDSLibrary.Desktop\Assets\pcds-library-icon.ico
 DefaultDirName={autopf}\PCDS Library Desktop
 DefaultGroupName=PCDS Library Desktop
 UninstallDisplayIcon={app}\PCDSLibrary.Desktop.exe
