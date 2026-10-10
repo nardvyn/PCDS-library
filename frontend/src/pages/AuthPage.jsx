@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BookOpen, Eye, EyeOff, LibraryBig, LoaderCircle } from 'lucide-react'
+import { Eye, EyeOff, LibraryBig, LoaderCircle } from 'lucide-react'
 
 import api from '../services/api'
 import GoogleSignInButton from '../components/GoogleSignInButton'
+import pcdsSeal from '../assets/pcds-seal.png'
 import './AuthPage.css'
 
 function AuthPage() {
@@ -128,12 +129,12 @@ function AuthPage() {
     <main className="auth-page">
       <div className="auth-shell">
         <section className="auth-intro">
-          <div className="brand-mark"><BookOpen size={22} strokeWidth={2.2} /></div>
+          <div className="brand-mark"><img src={pcdsSeal} alt="PCDS seal" /></div>
           <div className="eyebrow"><LibraryBig size={15} /> PCDS Library</div>
           <div className="intro-copy">
-            <p className="kicker">A quieter way to learn</p>
-            <h1>Make room for your next good read.</h1>
-            <p>Search the collection, manage borrowing requests, and keep your library life in one calm place.</p>
+            <p className="kicker">PCDS DIGITAL SERVICES</p>
+            <h1>Your campus library, connected.</h1>
+            <p>Search the collection, submit borrowing requests, and monitor your account from one official PCDS portal.</p>
           </div>
           <div className="intro-footer"><span className="footer-dot" /> Polytechnic College of Davao del Sur</div>
         </section>

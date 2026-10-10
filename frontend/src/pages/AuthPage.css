@@ -95,3 +95,10 @@ form h2 { margin: 0 0 9px; font: 600 clamp(1.9rem, 3vw, 2.45rem)/1.1 'Fraunces',
   .intro-copy { margin: 14px 0; }
   .intro-footer { display: none; }
 }
+
+/* PCDS Queue System visual language */
+:root { --ink: #12363d; --muted: #547177; --line: #cfe0e1; --paper: #f4f9f8; --moss: #00899a; --moss-deep: #006572; --sage: #c5e5e4; --coral: #c58a25; }
+.auth-page { background: radial-gradient(circle at 8% 8%, #d5efed 0, transparent 28%), radial-gradient(circle at 92% 90%, #e5f2ee 0, transparent 31%), repeating-linear-gradient(0deg, rgba(0,101,114,.035) 0, rgba(0,101,114,.035) 1px, transparent 1px, transparent 9px), var(--paper); }
+.auth-shell { border-color: rgba(0,101,114,.22); border-radius: 10px; box-shadow: 0 28px 80px rgba(0,76,86,.14), 0 4px 14px rgba(0,76,86,.06); }.auth-intro { background: linear-gradient(155deg, #005866, var(--moss)); }.brand-mark { width: 48px; height: 48px; color: #00798a; background: #fff; box-shadow: 0 0 0 5px rgba(255,255,255,.16); }.eyebrow, .intro-copy > p:last-child { color: #d6f1ef; }.eyebrow { font-weight: 700; letter-spacing: .08em; }.intro-footer { color: #c7e9e7; }.field label { color: #31565c; }.field input, .field select, .submit-button { border-radius: 6px; }
+
+.brand-mark { overflow: hidden; padding: 3px; } .brand-mark img { width: 100%; height: 100%; object-fit: contain; }

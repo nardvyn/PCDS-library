@@ -4,6 +4,7 @@ import { googleLogout } from '@react-oauth/google'
 import { Bell, BookOpen, BookOpenCheck, CalendarDays, ChevronRight, Clock3, History, LayoutDashboard, Library, LogOut, Menu, Search, UserRound, X } from 'lucide-react'
 
 import api from '../services/api'
+import pcdsSeal from '../assets/pcds-seal.png'
 import './DashboardPage.css'
 
 const initialSummary = { borrowed_books: 0, pending_requests: 0, overdue_books: 0, returned_books: 0, unread_notifications: 0, active_loans: [], recent_requests: [] }
@@ -80,7 +81,7 @@ function DashboardPage() {
     <div className="borrower-dashboard">
       {sidebarOpen && <button className="sidebar-overlay" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
       <aside className={`dashboard-sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="sidebar-brand"><div className="sidebar-logo"><BookOpen size={23} /></div><div><h1>PCDS Library</h1><p>Management System</p></div><button className="mobile-close-button" onClick={() => setSidebarOpen(false)} aria-label="Close menu"><X size={20} /></button></div>
+        <div className="sidebar-brand"><div className="sidebar-logo"><img src={pcdsSeal} alt="PCDS seal" /></div><div><h1>PCDS Library</h1><p>Digital Library System</p></div><button className="mobile-close-button" onClick={() => setSidebarOpen(false)} aria-label="Close menu"><X size={20} /></button></div>
         <nav className="sidebar-navigation">{navItems.map(([Icon, label, section, badge]) => <button key={section} className={`navigation-button ${activeSection === section ? 'active' : ''}`} onClick={() => navigateTo(section)}><Icon size={19} />{label}{badge > 0 && <span className="navigation-badge">{badge}</span>}</button>)}</nav>
         <div className="sidebar-account"><div className="sidebar-avatar">{firstName.charAt(0).toUpperCase()}</div><div className="sidebar-user-details"><strong>{user.full_name || 'User'}</strong><span>{user.role || 'STUDENT'}</span></div></div>
         <button className="sign-out-button" onClick={handleSignOut}><LogOut size={18} />Sign out</button>
@@ -102,7 +103,7 @@ function DashboardPage() {
 
 function DashboardOverview({ user, firstName, summary, loading, error, onRetry, borrowingPeriod, isTeacher, onNavigate, setSidebarOpen }) {
   return <>
-    <header className="dashboard-header"><button className="mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open menu"><Menu size={23} /></button><div><p className="header-label">MEMBER DASHBOARD</p><h2>Good day, {firstName}!</h2><p className="header-description">Search books and monitor your borrowing activity.</p></div><div className="header-actions"><button className="notification-button" onClick={() => onNavigate('notifications')} aria-label="Open notifications"><Bell size={20} />{summary.unread_notifications > 0 && <span className="notification-dot" />}</button><div className="header-profile"><div className="header-avatar">{firstName.charAt(0).toUpperCase()}</div><div><strong>{user.full_name || 'Library User'}</strong><span>{user.role || 'STUDENT'}</span></div></div></div></header>
+    <header className="dashboard-header"><button className="mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open menu"><Menu size={23} /></button><div><p className="header-label">PCDS DIGITAL LIBRARY</p><h2>Good day, {firstName}!</h2><p className="header-description">Search books and monitor your borrowing activity.</p></div><div className="header-actions"><button className="notification-button" onClick={() => onNavigate('notifications')} aria-label="Open notifications"><Bell size={20} />{summary.unread_notifications > 0 && <span className="notification-dot" />}</button><div className="header-profile"><div className="header-avatar">{firstName.charAt(0).toUpperCase()}</div><div><strong>{user.full_name || 'Library User'}</strong><span>{user.role || 'STUDENT'}</span></div></div></div></header>
     {error && <div className="catalog-message error" role="alert">{error} <button type="button" className="text-action-button" onClick={onRetry}>Try again</button></div>}
     <section className="summary-grid"><SummaryCard icon={<BookOpenCheck size={22} />} label="Currently borrowed" value={summary.borrowed_books} color="blue" onClick={() => onNavigate('loans')} /><SummaryCard icon={<Clock3 size={22} />} label="Pending requests" value={summary.pending_requests} color="orange" onClick={() => onNavigate('requests')} /><SummaryCard icon={<CalendarDays size={22} />} label="Overdue books" value={summary.overdue_books} color="red" onClick={() => onNavigate('loans')} /><SummaryCard icon={<History size={22} />} label="Books returned" value={summary.returned_books} color="green" onClick={() => onNavigate('history')} /></section>
     <section className="dashboard-content-grid">
@@ -247,8 +248,14 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
         </article>
       })}</div>
       : <div className="dashboard-panel section-placeholder"><Library size={34} /><h3>No books found</h3><p>Try another title, author, ISBN, or call number.</p></div>}
-    <details className="manual-request-disclosure">
-      <summary>Request a book not listed in the catalog</summary>
+    <section className="manual-request-disclosure" aria-labelledby="manual-request-heading">
+      <div className="manual-request-heading">
+        <div>
+          <p className="manual-request-eyebrow">CAN'T FIND THE BOOK?</p>
+          <h3 id="manual-request-heading">Request a book not listed in the catalog</h3>
+          <p>Send the book details and a clear photo for the library staff to review.</p>
+        </div>
+      </div>
       <form className="borrow-request-form" onSubmit={submitRequest}>
         <div className="field"><label htmlFor="borrow-book-title">Title of the book</label><input id="borrow-book-title" name="title" value={form.title} onChange={updateForm} placeholder="Enter the book title" required /></div>
         <div className="field"><label htmlFor="borrow-call-number">Call number</label><input id="borrow-call-number" name="call_number" value={form.call_number} onChange={updateForm} placeholder="e.g. Cir. 005.B" required /></div>
@@ -256,7 +263,7 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
         <div className="field"><label htmlFor="borrow-book-photo">Picture of the book</label><input id="borrow-book-photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setBookPhoto(event.target.files?.[0] || null)} required /><span className="form-help">JPG, PNG, or WebP. The photo is sent privately for staff review.</span></div>
         <button className="request-book-button borrow-submit" type="submit" disabled={!canRequest || !profileVerified || loading}>{loading ? 'Submitting request...' : 'Submit borrow request'}</button>
       </form>
-    </details>
+    </section>
   </>
 }
 function LoansSection({ summary, loading, onNavigate }) { return <><SectionHeader title="My Borrowed Books" description="Track active loans and due dates from your account." icon={<BookOpenCheck size={24} />} /><div className="dashboard-panel section-list-panel">{loading ? <DashboardLoading /> : summary.active_loans.length ? summary.active_loans.map((loan) => <LoanItem key={loan.loan_id} loan={loan} />) : <EmptyState icon={<Library size={30} />} title="No borrowed books" description="You do not have any active loans." buttonText="Browse books" onClick={() => onNavigate('books')} />}</div></> }
