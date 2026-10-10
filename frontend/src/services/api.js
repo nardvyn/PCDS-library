@@ -19,4 +19,21 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const requestUrl = error.config?.url || ''
+    const isSignInRequest = /^\/auth\/(login|google)(?:[/?]|$)/.test(requestUrl)
+
+    if (error.response?.status === 401 && !isSignInRequest && error.config?.headers?.Authorization) {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('user')
+      sessionStorage.setItem('pcds_session_expired', 'true')
+      window.location.replace('/?session=expired')
+    }
+
+    return Promise.reject(error)
+  },
+)
+
 export default api

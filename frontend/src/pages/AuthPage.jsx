@@ -16,7 +16,11 @@ function AuthPage() {
   const resetToken = new URLSearchParams(location.search).get('token') || ''
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [message, setMessage] = useState(null)
+  const [message, setMessage] = useState(() => {
+    if (sessionStorage.getItem('pcds_session_expired') !== 'true') return null
+    sessionStorage.removeItem('pcds_session_expired')
+    return { type: 'error', text: 'Your session expired or is no longer valid. Please sign in again.' }
+  })
   const [loading, setLoading] = useState(false)
   const [loginData, setLoginData] = useState({ email: '', password: '' })
   const [forgotEmail, setForgotEmail] = useState('')
