@@ -65,6 +65,8 @@ namespace PCDSLibrary.Desktop.Views
         {
             bool isAdmin = _currentRole == "ADMIN";
 
+            SidebarRoleText.Text = _currentRole;
+            HeaderRoleText.Text = _currentRole;
             UserManagementButton.IsEnabled = isAdmin;
             AuditLogsButton.IsEnabled = isAdmin;
 
@@ -130,30 +132,38 @@ namespace PCDSLibrary.Desktop.Views
             headingGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headingGrid.Children.Add(CreateHeading("Dashboard", "Overview of library operations and request activities"));
             var refreshPanel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right };
-            var refreshButton = CreateRequestButton("Refresh", "#15577F");
+            var refreshButton = CreateRequestButton("Refresh", "#00899A");
             refreshButton.Margin = new Thickness(0, 4, 0, 0);
             refreshButton.Click += async (_, _) => await LoadDashboardSummaryAsync(refreshButton);
             refreshPanel.Children.Add(refreshButton);
-            _dashboardRefreshStatus = new TextBlock { Margin = new Thickness(0, 5, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")), HorizontalAlignment = HorizontalAlignment.Right };
+            _dashboardRefreshStatus = new TextBlock { Margin = new Thickness(0, 5, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")), HorizontalAlignment = HorizontalAlignment.Right };
             refreshPanel.Children.Add(_dashboardRefreshStatus);
             Grid.SetColumn(refreshPanel, 1);
             headingGrid.Children.Add(refreshPanel);
-            content.Children.Add(headingGrid);
+            content.Children.Add(new Border
+            {
+                Padding = new Thickness(21, 18, 21, 18),
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12),
+                Child = headingGrid
+            });
 
             var metrics = new UniformGrid
             {
                 Columns = 4,
                 Rows = 2,
-                Margin = new Thickness(0, 24, 0, 0)
+                Margin = new Thickness(0, 13, 0, 0)
             };
 
-            metrics.Children.Add(CreateMetric("Total Books", "—", "#172630", value => _totalBooksValue = value));
-            metrics.Children.Add(CreateMetric("Available Books", "—", "#172630", value => _availableBooksValue = value));
-            metrics.Children.Add(CreateMetric("Borrowed Books", "—", "#172630", value => _borrowedBooksValue = value));
-            metrics.Children.Add(CreateMetric("Pending Requests", "—", "#172630", value => _pendingRequestsValue = value));
-            metrics.Children.Add(CreateMetric("Approved Requests", "—", "#172630", value => _approvedRequestsValue = value));
+            metrics.Children.Add(CreateMetric("Total Books", "—", "#12363D", value => _totalBooksValue = value));
+            metrics.Children.Add(CreateMetric("Available Books", "—", "#12363D", value => _availableBooksValue = value));
+            metrics.Children.Add(CreateMetric("Borrowed Books", "—", "#12363D", value => _borrowedBooksValue = value));
+            metrics.Children.Add(CreateMetric("Pending Requests", "—", "#12363D", value => _pendingRequestsValue = value));
+            metrics.Children.Add(CreateMetric("Approved Requests", "—", "#12363D", value => _approvedRequestsValue = value));
             metrics.Children.Add(CreateMetric("Overdue Books", "—", "#B42318", value => _overdueBooksValue = value));
-            metrics.Children.Add(CreateMetric("Students + Teachers", "—", "#172630", value => _borrowersValue = value));
+            metrics.Children.Add(CreateMetric("Students + Teachers", "—", "#12363D", value => _borrowersValue = value));
             metrics.Children.Add(CreateMetric("Unpaid Penalties", "—", "#A11D1D", value => _unpaidPenaltiesValue = value));
 
             content.Children.Add(metrics);
@@ -313,7 +323,7 @@ namespace PCDSLibrary.Desktop.Views
             {
                 Text = "This module is ready for its API and database functions.",
                 Margin = new Thickness(0, 8, 0, 0),
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#687B86")),
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")),
                 HorizontalAlignment = HorizontalAlignment.Center
             });
 
@@ -325,10 +335,10 @@ namespace PCDSLibrary.Desktop.Views
         private StackPanel CreateLoanListContent(bool overdueOnly, bool allowReturn)
         {
             var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
-            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) };
+            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
             var list = new StackPanel();
             var scroll = new ScrollViewer { Content = list, MaxHeight = 560, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            var refresh = CreateRequestButton("Refresh", "#15577F");
+            var refresh = CreateRequestButton("Refresh", "#00899A");
             refresh.Click += async (_, _) => await LoadLoanListAsync(list, status, overdueOnly, allowReturn);
             panel.Children.Add(refresh);
             panel.Children.Add(status);
@@ -351,7 +361,7 @@ namespace PCDSLibrary.Desktop.Views
             status.Text = $"{result.Loans.Count} record(s)";
             if (result.Loans.Count == 0)
             {
-                list.Children.Add(CreateRequestMessage(overdueOnly ? "No overdue books." : "No active loans." , "#607380"));
+                list.Children.Add(CreateRequestMessage(overdueOnly ? "No overdue books." : "No active loans." , "#547177"));
                 return;
             }
             foreach (var loan in result.Loans)
@@ -396,9 +406,9 @@ namespace PCDSLibrary.Desktop.Views
             layout.Children.Add(condition);
             var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
             string? selection = null;
-            var confirm = CreateRequestButton("Continue", "#15577F");
+            var confirm = CreateRequestButton("Continue", "#00899A");
             confirm.Click += (_, _) => { selection = condition.SelectedItem?.ToString(); dialog.DialogResult = true; };
-            var cancel = CreateRequestButton("Cancel", "#687B86");
+            var cancel = CreateRequestButton("Cancel", "#547177");
             cancel.Click += (_, _) => dialog.DialogResult = false;
             actions.Children.Add(confirm);
             actions.Children.Add(cancel);
@@ -411,9 +421,9 @@ namespace PCDSLibrary.Desktop.Views
         private StackPanel CreatePenaltiesContent()
         {
             var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
-            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) };
+            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
             var list = new StackPanel();
-            var refresh = CreateRequestButton("Refresh", "#15577F");
+            var refresh = CreateRequestButton("Refresh", "#00899A");
             refresh.Click += async (_, _) => await LoadPenaltiesAsync(list, status);
             panel.Children.Add(refresh);
             panel.Children.Add(status);
@@ -429,7 +439,7 @@ namespace PCDSLibrary.Desktop.Views
             var result = await _apiService.GetPenaltiesAsync();
             if (!result.Success) { status.Text = result.Message; return; }
             status.Text = $"{result.Penalties.Count} penalty record(s)";
-            if (result.Penalties.Count == 0) { list.Children.Add(CreateRequestMessage("No penalties recorded.", "#607380")); return; }
+            if (result.Penalties.Count == 0) { list.Children.Add(CreateRequestMessage("No penalties recorded.", "#547177")); return; }
             foreach (var penalty in result.Penalties)
             {
                 var row = CreateLibraryRow(penalty.BookTitle, $"{penalty.BorrowerName} ({penalty.SchoolId}) • {penalty.LateDays} late day(s)", $"PHP {penalty.Amount:0.00} • {penalty.Status} • {FormatRequestDate(penalty.CreatedAt)}", penalty.Status == "UNPAID" ? "Mark paid" : null, async () =>
@@ -445,7 +455,7 @@ namespace PCDSLibrary.Desktop.Views
         private StackPanel CreateBorrowersContent()
         {
             var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
-            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) };
+            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
             var grid = new DataGrid { AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false, RowHeaderWidth = 0, RowHeight = 30, ColumnHeaderHeight = 32, FontSize = 13, MaxHeight = 560, Background = Brushes.White };
             grid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new Binding(nameof(BorrowerData.FullName)), Width = 180 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Type", Binding = new Binding(nameof(BorrowerData.Role)), Width = 90 });
@@ -454,7 +464,7 @@ namespace PCDSLibrary.Desktop.Views
             grid.Columns.Add(new DataGridTextColumn { Header = "Section", Binding = new Binding(nameof(BorrowerData.Section)), Width = 100 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Verification", Binding = new Binding(nameof(BorrowerData.VerificationStatus)), Width = 170 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Account", Binding = new Binding(nameof(BorrowerData.AccountStatus)), Width = 100 });
-            var refresh = CreateRequestButton("Refresh", "#15577F");
+            var refresh = CreateRequestButton("Refresh", "#00899A");
             refresh.Click += async (_, _) => await LoadBorrowersAsync(grid, status);
             panel.Children.Add(refresh);
             panel.Children.Add(status);
@@ -474,7 +484,7 @@ namespace PCDSLibrary.Desktop.Views
         private StackPanel CreateNotificationComposer()
         {
             var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 0), MaxWidth = 720 };
-            panel.Children.Add(new TextBlock { Text = "Send an announcement to student and teacher accounts.", Margin = new Thickness(0, 0, 0, 16), FontSize = 13, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
+            panel.Children.Add(new TextBlock { Text = "Send an announcement to student and teacher accounts.", Margin = new Thickness(0, 0, 0, 16), FontSize = 13, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             panel.Children.Add(new TextBlock { Text = "Audience", FontWeight = FontWeights.SemiBold });
             var audience = new ComboBox { Height = 38, Margin = new Thickness(0, 5, 0, 14), ItemsSource = new[] { "ALL", "STUDENT", "TEACHER" }, SelectedIndex = 0 };
             panel.Children.Add(audience);
@@ -484,8 +494,8 @@ namespace PCDSLibrary.Desktop.Views
             panel.Children.Add(new TextBlock { Text = "Message", FontWeight = FontWeights.SemiBold });
             var message = new TextBox { Height = 130, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 5, 0, 14), Padding = new Thickness(10) };
             panel.Children.Add(message);
-            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) };
-            var send = CreateRequestButton("Send notification", "#15577F");
+            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
+            var send = CreateRequestButton("Send notification", "#00899A");
             send.Click += async (_, _) =>
             {
                 if (string.IsNullOrWhiteSpace(title.Text) || string.IsNullOrWhiteSpace(message.Text)) { status.Text = "Enter both a title and message."; return; }
@@ -503,9 +513,9 @@ namespace PCDSLibrary.Desktop.Views
         private StackPanel CreateReportsContent()
         {
             var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
-            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) };
+            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
             var grid = new UniformGrid { Columns = 3, Rows = 3, Margin = new Thickness(-8, 8, -8, 0) };
-            var refresh = CreateRequestButton("Refresh report", "#15577F");
+            var refresh = CreateRequestButton("Refresh report", "#00899A");
             refresh.Click += async (_, _) => await LoadReportsAsync(grid, status, refresh);
             panel.Children.Add(refresh);
             panel.Children.Add(status);
@@ -534,18 +544,18 @@ namespace PCDSLibrary.Desktop.Views
 
         private Border CreateLibraryRow(string title, string subtitle, string metadata, string? actionLabel, Func<Task>? action)
         {
-            var card = new Border { Margin = new Thickness(0, 0, 0, 10), Padding = new Thickness(15), Background = Brushes.White, CornerRadius = new CornerRadius(9), BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE6EB")), BorderThickness = new Thickness(1) };
+            var card = new Border { Margin = new Thickness(0, 0, 0, 10), Padding = new Thickness(15), Background = Brushes.White, CornerRadius = new CornerRadius(9), BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")), BorderThickness = new Thickness(1) };
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var details = new StackPanel();
-            details.Children.Add(new TextBlock { Text = title, FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#172630")) });
-            details.Children.Add(new TextBlock { Text = subtitle, Margin = new Thickness(0, 4, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
-            details.Children.Add(new TextBlock { Text = metadata, Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A9AA4")) });
+            details.Children.Add(new TextBlock { Text = title, FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D")) });
+            details.Children.Add(new TextBlock { Text = subtitle, Margin = new Thickness(0, 4, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            details.Children.Add(new TextBlock { Text = metadata, Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#789094")) });
             grid.Children.Add(details);
             if (actionLabel != null && action != null)
             {
-                var button = CreateRequestButton(actionLabel, "#15577F");
+                var button = CreateRequestButton(actionLabel, "#00899A");
                 button.VerticalAlignment = VerticalAlignment.Center;
                 button.Click += async (_, _) => { button.IsEnabled = false; await action(); button.IsEnabled = true; };
                 Grid.SetColumn(button, 1);
@@ -563,11 +573,11 @@ namespace PCDSLibrary.Desktop.Views
                 Text = "Recent administrative and library actions. Entries are read-only and retained for accountability.",
                 Margin = new Thickness(0, 0, 0, 14),
                 FontSize = 13,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380"))
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177"))
             });
 
-            var status = new TextBlock { MinHeight = 24, FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) };
-            var refreshButton = CreateRequestButton("Refresh", "#15577F");
+            var status = new TextBlock { MinHeight = 24, FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
+            var refreshButton = CreateRequestButton("Refresh", "#00899A");
             var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
             toolbar.Children.Add(refreshButton);
             toolbar.Children.Add(status);
@@ -584,7 +594,7 @@ namespace PCDSLibrary.Desktop.Views
                 RowHeaderWidth = 0,
                 MaxHeight = 560,
                 Background = Brushes.White,
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE6EB"))
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1"))
             };
             grid.Columns.Add(new DataGridTextColumn { Header = "Time", Binding = new Binding(nameof(AuditLogData.TimestampDisplay)), Width = 165 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Actor", Binding = new Binding(nameof(AuditLogData.ActorName)), Width = 150 });
@@ -622,7 +632,7 @@ namespace PCDSLibrary.Desktop.Views
                 Text = "Review borrower details, verify uploaded IDs, and manage account access.",
                 Margin = new Thickness(0, 0, 0, 16),
                 FontSize = 13,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380"))
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177"))
             });
             var list = new StackPanel();
             panel.Children.Add(new ScrollViewer
@@ -639,7 +649,7 @@ namespace PCDSLibrary.Desktop.Views
         private async Task LoadVerificationProfilesAsync(StackPanel list)
         {
             list.Children.Clear();
-            list.Children.Add(CreateRequestMessage("Loading verification profiles...", "#607380"));
+            list.Children.Add(CreateRequestMessage("Loading verification profiles...", "#547177"));
             var result = await _apiService.GetVerificationProfilesAsync();
             list.Children.Clear();
             if (!result.Success)
@@ -650,7 +660,7 @@ namespace PCDSLibrary.Desktop.Views
             if (result.Profiles.Count == 0)
             {
                 UpdatePendingUsersBadge(result.Profiles);
-                list.Children.Add(CreateRequestMessage("No user accounts found.", "#607380"));
+                list.Children.Add(CreateRequestMessage("No user accounts found.", "#547177"));
                 return;
             }
             UpdatePendingUsersBadge(result.Profiles);
@@ -674,34 +684,34 @@ namespace PCDSLibrary.Desktop.Views
                 Padding = new Thickness(16),
                 Background = Brushes.White,
                 CornerRadius = new CornerRadius(10),
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE6EB")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
                 BorderThickness = new Thickness(1)
             };
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(320) });
             var details = new StackPanel();
-            details.Children.Add(new TextBlock { Text = profile.FullName, FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#172630")) });
-            details.Children.Add(new TextBlock { Text = $"{profile.Role} • {profile.AccountStatus} • {profile.VerificationStatus}", Margin = new Thickness(0, 5, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
-            details.Children.Add(new TextBlock { Text = $"School/Employee ID: {profile.SchoolIdNumber ?? "Not provided"}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
-            details.Children.Add(new TextBlock { Text = profile.Email, Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A9AA4")) });
+            details.Children.Add(new TextBlock { Text = profile.FullName, FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D")) });
+            details.Children.Add(new TextBlock { Text = $"{profile.Role} • {profile.AccountStatus} • {profile.VerificationStatus}", Margin = new Thickness(0, 5, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            details.Children.Add(new TextBlock { Text = $"School/Employee ID: {profile.SchoolIdNumber ?? "Not provided"}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            details.Children.Add(new TextBlock { Text = profile.Email, Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#789094")) });
             var academicDetails = profile.Role == "TEACHER"
                 ? profile.Department
                 : string.Join(" • ", new[] { profile.Course, profile.YearLevel, profile.Section }.Where(value => !string.IsNullOrWhiteSpace(value)));
             if (!string.IsNullOrWhiteSpace(academicDetails))
-                details.Children.Add(new TextBlock { Text = academicDetails, Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
+                details.Children.Add(new TextBlock { Text = academicDetails, Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             if (!string.IsNullOrWhiteSpace(profile.ContactNumber))
-                details.Children.Add(new TextBlock { Text = $"Phone: {profile.ContactNumber}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
+                details.Children.Add(new TextBlock { Text = $"Phone: {profile.ContactNumber}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             if (!string.IsNullOrWhiteSpace(profile.Address))
-                details.Children.Add(new TextBlock { Text = $"Address: {profile.Address}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
+                details.Children.Add(new TextBlock { Text = $"Address: {profile.Address}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             if (profile.Role is "STUDENT" or "TEACHER" && !profile.SchoolIdImageAvailable)
                 details.Children.Add(new TextBlock { Text = "School ID image unavailable. Ask the borrower to resubmit their profile.", Margin = new Thickness(0, 5, 0, 0), FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A6533D")), TextWrapping = TextWrapping.Wrap });
-            details.Children.Add(new TextBlock { Text = $"Registered: {FormatRequestDate(profile.CreatedAt ?? "")}", Margin = new Thickness(0, 3, 0, 0), FontSize = 10, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A9AA4")) });
+            details.Children.Add(new TextBlock { Text = $"Registered: {FormatRequestDate(profile.CreatedAt ?? "")}", Margin = new Thickness(0, 3, 0, 0), FontSize = 10, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#789094")) });
             grid.Children.Add(details);
             var actions = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
             if (profile.ProfileId.HasValue && profile.SchoolIdImageAvailable)
             {
-                var viewButton = CreateRequestButton("View ID", "#15577F");
+                var viewButton = CreateRequestButton("View ID", "#00899A");
                 viewButton.Tag = profile.ProfileId.Value;
                 viewButton.Click += ViewSchoolIdButton_Click;
                 actions.Children.Add(viewButton);
@@ -709,7 +719,7 @@ namespace PCDSLibrary.Desktop.Views
             if (profile.ProfileId.HasValue && (profile.Role == "STUDENT" || profile.Role == "TEACHER"))
             {
                 if (profile.ProfileComplete && profile.VerificationStatus is "PENDING_VERIFICATION" or "REJECTED" or "SUSPENDED")
-                    AddVerificationAction(actions, "Verify", "VERIFIED", "#24734C", profile, list);
+                    AddVerificationAction(actions, "Verify", "VERIFIED", "#18724A", profile, list);
                 if (profile.VerificationStatus == "PENDING_VERIFICATION")
                     AddVerificationAction(actions, "Reject", "REJECTED", "#A6533D", profile, list);
                 if (profile.VerificationStatus != "SUSPENDED")
@@ -723,7 +733,7 @@ namespace PCDSLibrary.Desktop.Views
                 actions.Children.Add(deleteButton);
             }
             if (actions.Children.Count == 0)
-                actions.Children.Add(new TextBlock { Text = "Staff account", Margin = new Thickness(8), VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
+                actions.Children.Add(new TextBlock { Text = "Staff account", Margin = new Thickness(8), VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             Grid.SetColumn(actions, 1);
             grid.Children.Add(actions);
             card.Child = grid;
@@ -776,7 +786,7 @@ namespace PCDSLibrary.Desktop.Views
 
             var content = new StackPanel();
             content.Children.Add(CreateHeading("School ID image", "Privately loaded from the verification service."));
-            var backButton = CreateRequestButton("Back to users", "#15577F");
+            var backButton = CreateRequestButton("Back to users", "#00899A");
             backButton.Margin = new Thickness(0, 18, 0, 12);
             backButton.HorizontalAlignment = HorizontalAlignment.Left;
             backButton.Click += (_, _) => ShowModuleContent("User Management", "Manage user accounts and verify uploaded school IDs.", "", UserManagementButton);
@@ -787,7 +797,7 @@ namespace PCDSLibrary.Desktop.Views
                 Padding = new Thickness(12),
                 Background = Brushes.White,
                 CornerRadius = new CornerRadius(10),
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE6EB")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
                 BorderThickness = new Thickness(1)
             };
             imageFrame.Child = new Image
@@ -834,7 +844,7 @@ namespace PCDSLibrary.Desktop.Views
                 Text = "Pending requests are submitted by students and teachers.",
                 Margin = new Thickness(0, 0, 0, 16),
                 FontSize = 13,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380"))
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177"))
             });
             var list = new StackPanel();
             panel.Children.Add(list);
@@ -849,7 +859,7 @@ namespace PCDSLibrary.Desktop.Views
             {
                 Text = "Loading pending requests...",
                 Padding = new Thickness(20),
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380"))
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177"))
             });
 
             var result = await _apiService.GetBorrowRequestsAsync();
@@ -864,7 +874,7 @@ namespace PCDSLibrary.Desktop.Views
             PendingRequestsBadge.Visibility = currentPendingCount > 0 ? Visibility.Visible : Visibility.Collapsed;
             if (result.Requests.Count == 0)
             {
-                list.Children.Add(CreateRequestMessage("No pending borrow requests.", "#607380"));
+                list.Children.Add(CreateRequestMessage("No pending borrow requests.", "#547177"));
                 return;
             }
 
@@ -880,29 +890,29 @@ namespace PCDSLibrary.Desktop.Views
                 Padding = new Thickness(16),
                 Background = Brushes.White,
                 CornerRadius = new CornerRadius(10),
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE6EB")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
                 BorderThickness = new Thickness(1)
             };
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var details = new StackPanel();
-            details.Children.Add(new TextBlock { Text = request.BookTitle, FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#172630")) });
-            details.Children.Add(new TextBlock { Text = $"Requested by {request.BorrowerName} ({request.SchoolId})", Margin = new Thickness(0, 5, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
-            details.Children.Add(new TextBlock { Text = $"Call number: {request.CallNumber} • Accession: {request.AccessionNumber}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
+            details.Children.Add(new TextBlock { Text = request.BookTitle, FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D")) });
+            details.Children.Add(new TextBlock { Text = $"Requested by {request.BorrowerName} ({request.SchoolId})", Margin = new Thickness(0, 5, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            details.Children.Add(new TextBlock { Text = $"Call number: {request.CallNumber} • Accession: {request.AccessionNumber}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             if (!string.IsNullOrWhiteSpace(request.Author))
-                details.Children.Add(new TextBlock { Text = $"Author: {request.Author}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) });
-            details.Children.Add(new TextBlock { Text = FormatRequestDate(request.RequestedAt), Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A9AA4")) });
+                details.Children.Add(new TextBlock { Text = $"Author: {request.Author}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            details.Children.Add(new TextBlock { Text = FormatRequestDate(request.RequestedAt), Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#789094")) });
             grid.Children.Add(details);
             var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             if (request.HasBookImage)
             {
-                var photoButton = CreateRequestButton("View photo", "#15577F");
+                var photoButton = CreateRequestButton("View photo", "#00899A");
                 photoButton.Tag = request.RequestId;
                 photoButton.Click += ViewBorrowRequestPhoto_Click;
                 actions.Children.Add(photoButton);
             }
-            var approve = CreateRequestButton("Approve", "#24734C");
+            var approve = CreateRequestButton("Approve", "#18724A");
             approve.Tag = request.RequestId;
             approve.Click += (sender, args) => ProcessBorrowRequestAsync(sender, args, "APPROVED", list);
             actions.Children.Add(approve);
@@ -940,12 +950,12 @@ namespace PCDSLibrary.Desktop.Views
             }
             var content = new StackPanel();
             content.Children.Add(CreateHeading("Requested book photo", "Submitted by the borrower for staff verification."));
-            var backButton = CreateRequestButton("Back to requests", "#15577F");
+            var backButton = CreateRequestButton("Back to requests", "#00899A");
             backButton.Margin = new Thickness(0, 18, 0, 12);
             backButton.HorizontalAlignment = HorizontalAlignment.Left;
             backButton.Click += (_, _) => ShowModuleContent("Borrow Requests", "Review and process pending borrow requests.", "", BorrowRequestsButton);
             content.Children.Add(backButton);
-            var imageFrame = new Border { Padding = new Thickness(12), Background = Brushes.White, CornerRadius = new CornerRadius(10), BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE6EB")), BorderThickness = new Thickness(1) };
+            var imageFrame = new Border { Padding = new Thickness(12), Background = Brushes.White, CornerRadius = new CornerRadius(10), BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")), BorderThickness = new Thickness(1) };
             imageFrame.Child = new Image { Source = image, Stretch = System.Windows.Media.Stretch.Uniform, MaxHeight = 540, MaxWidth = 850 };
             content.Children.Add(imageFrame);
             MainContent.Content = content;
@@ -968,8 +978,8 @@ namespace PCDSLibrary.Desktop.Views
             return new Button
             {
                 Content = text,
-                Height = 34,
-                MinWidth = 76,
+                Height = 38,
+                MinWidth = 82,
                 Margin = new Thickness(6, 0, 0, 0),
                 Padding = new Thickness(10, 0, 10, 0),
                 Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color)),
@@ -1028,16 +1038,16 @@ namespace PCDSLibrary.Desktop.Views
                 IsChecked = settings.NotificationsEnabled,
                 Margin = new Thickness(0, 0, 0, 18),
                 FontSize = 13,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#344B58") )
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#31565C") )
             };
             form.Children.Add(_notificationsInput);
 
             var actions = new StackPanel { Orientation = Orientation.Horizontal };
-            var saveButton = CreateSettingsButton("Save changes", "#15577F");
+            var saveButton = CreateSettingsButton("Save changes", "#00899A");
             saveButton.Click += SaveSettingsButton_Click;
             actions.Children.Add(saveButton);
             var resetButton = CreateSettingsButton("Reset defaults", "#E7EEF2");
-            resetButton.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#344B58"));
+            resetButton.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#31565C"));
             resetButton.Click += ResetSettingsButton_Click;
             actions.Children.Add(resetButton);
             form.Children.Add(actions);
@@ -1068,7 +1078,7 @@ namespace PCDSLibrary.Desktop.Views
                 FontSize = 14,
                 LineHeight = 22,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#172630"))
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D"))
             };
         }
 
@@ -1125,7 +1135,7 @@ namespace PCDSLibrary.Desktop.Views
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
-            _booksCatalogStatus = new TextBlock { Margin = new Thickness(0, 0, 0, 8), FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")) };
+            _booksCatalogStatus = new TextBlock { Margin = new Thickness(0, 0, 0, 8), FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
             form.Children.Add(_booksCatalogStatus);
             _booksCatalogGrid = new DataGrid
             {
@@ -1150,8 +1160,8 @@ namespace PCDSLibrary.Desktop.Views
             form.Children.Add(_booksCatalogGrid);
 
             _bookCoverImage = new Image { Width = 120, Height = 160, Stretch = Stretch.Uniform, Visibility = Visibility.Collapsed };
-            _bookCoverStatus = new TextBlock { Text = "No cover photo available.", Width = 120, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380")), VerticalAlignment = VerticalAlignment.Center };
-            _bookDetailsContent = new TextBlock { MaxWidth = 500, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, FontSize = 13, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#172630")) };
+            _bookCoverStatus = new TextBlock { Text = "No cover photo available.", Width = 120, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")), VerticalAlignment = VerticalAlignment.Center };
+            _bookDetailsContent = new TextBlock { MaxWidth = 500, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, FontSize = 13, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D")) };
             var coverColumn = new StackPanel { Width = 145, Margin = new Thickness(0, 0, 20, 0), HorizontalAlignment = HorizontalAlignment.Center };
             coverColumn.Children.Add(_bookCoverImage);
             coverColumn.Children.Add(_bookCoverStatus);
@@ -1163,7 +1173,7 @@ namespace PCDSLibrary.Desktop.Views
                 Margin = new Thickness(0, 12, 0, 0),
                 Padding = new Thickness(14),
                 Background = Brushes.White,
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE6EB")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
                 BorderThickness = new Thickness(1),
                 Child = detailsLayout,
                 Visibility = Visibility.Collapsed
@@ -1230,7 +1240,7 @@ namespace PCDSLibrary.Desktop.Views
                 Margin = new Thickness(0, 0, 0, 5),
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#172630"))
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D"))
             });
             var input = new TextBox
             {
@@ -1251,39 +1261,42 @@ namespace PCDSLibrary.Desktop.Views
                 Text = title,
                 FontSize = 30,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#172630"))
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D"))
             });
             heading.Children.Add(new TextBlock
             {
                 Text = description,
                 Margin = new Thickness(0, 6, 0, 0),
                 FontSize = 14,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380"))
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177"))
             });
             return heading;
         }
 
-        private static Border CreateMetric(string label, string value, string valueColor = "#172630", Action<TextBlock>? registerValue = null)
+        private static Border CreateMetric(string label, string value, string valueColor = "#12363D", Action<TextBlock>? registerValue = null)
         {
             var card = new Border
             {
-                Margin = new Thickness(8),
-                Padding = new Thickness(16),
+                Margin = new Thickness(7),
+                Padding = new Thickness(17),
                 Background = Brushes.White,
-                CornerRadius = new CornerRadius(12)
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                MinHeight = 108
             };
             var content = new StackPanel();
             content.Children.Add(new TextBlock
             {
                 Text = label,
-                FontSize = 13,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#607380"))
+                FontSize = 12,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177"))
             });
             var valueText = new TextBlock
             {
                 Text = value,
                 Margin = new Thickness(0, 8, 0, 0),
-                FontSize = 32,
+                FontSize = 29,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(valueColor))
             };
@@ -1303,10 +1316,10 @@ namespace PCDSLibrary.Desktop.Views
                 ReportsButton, UserManagementButton, AuditLogsButton, SettingsButton
             })
             {
-                button.Background = Brushes.Transparent;
+                button.Tag = null;
             }
 
-            selectedButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1A567A"));
+            selectedButton.Tag = "Active";
         }
 
         private void DashboardButton_Click(

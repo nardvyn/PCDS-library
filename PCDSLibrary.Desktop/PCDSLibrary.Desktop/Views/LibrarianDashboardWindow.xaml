@@ -3,69 +3,178 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:PCDSLibrary.Desktop.Views"
         Title="PCDS Library - Dashboard"
-        Width="1200"
-        Height="720"
-        MinWidth="1000"
+        Icon="/Assets/pcds-seal.png"
+        Width="1320"
+        Height="700"
+        MinWidth="1050"
         MinHeight="620"
         WindowStartupLocation="CenterScreen"
-        Background="#F3F6FA">
+        Background="{StaticResource CanvasBrush}"
+        FontFamily="Segoe UI">
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="245"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" Background="#123E5A">
-            <DockPanel Margin="20">
-                <StackPanel DockPanel.Dock="Top">
-                    <TextBlock Text="PCDS Library"
-                               FontSize="24"
-                               FontWeight="SemiBold"
-                               Foreground="White"/>
-                    <TextBlock Margin="0,6,0,20"
-                               Text="Admin / Librarian"
-                               FontSize="12"
-                               Foreground="#BFD4E0"/>
+        <Border Grid.Column="0">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#006B78" Offset="0"/>
+                    <GradientStop Color="#004C58" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Top" Margin="18,24,18,20">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="42" Height="42" Padding="3" Background="White" CornerRadius="21">
+                            <Image Source="/Assets/pcds-seal.png" Stretch="Uniform" AutomationProperties.Name="PCDS seal"/>
+                        </Border>
+                        <StackPanel Margin="10,2,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="PCDS Library" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Digital Library System" Margin="0,3,0,0" FontSize="10" Foreground="#C7ECE8"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Border Height="1" Margin="0,20,0,0" Background="#FFFFFF24"/>
                 </StackPanel>
 
-                <views:ConnectionStatusControl DockPanel.Dock="Bottom" Margin="0,12,0,0"/>
-
-                <StackPanel>
-                    <Button x:Name="DashboardButton" Content="Dashboard" Height="40" Margin="0,0,0,10" Background="#1A567A" Foreground="White" BorderThickness="0" Click="DashboardButton_Click"/>
-                    <Button x:Name="BorrowRequestsButton" Height="36" Margin="0,0,0,8" Background="Transparent" Foreground="#E7F1F6" BorderBrush="#2A6284" Click="BorrowRequestsButton_Click">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="Borrow Requests" VerticalAlignment="Center"/>
-                            <Border x:Name="PendingRequestsBadge" Width="20" Height="20" Margin="8,0,0,0" CornerRadius="10" Background="#F4C542" Visibility="Collapsed" VerticalAlignment="Center">
-                                <TextBlock x:Name="PendingRequestsCountText" Text="0" Foreground="#3D310A" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
+                <StackPanel DockPanel.Dock="Bottom" Margin="14,8,14,14">
+                    <Border Height="1" Margin="4,0,4,12" Background="#FFFFFF24"/>
+                    <Grid Margin="5,0,5,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="38"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Width="36" Height="36" Background="#19A9B2" CornerRadius="18">
+                            <TextBlock Text="L"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="9,0,0,0">
+                            <TextBlock Text="Library staff" FontSize="12" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock x:Name="SidebarRoleText" Text="STAFF" Margin="0,3,0,0" FontSize="10" Foreground="#BDE5E1"/>
                         </StackPanel>
-                    </Button>
-                    <Button x:Name="ActiveLoansButton" Content="Active Loans" Height="36" Margin="0,0,0,8" Background="Transparent" Foreground="#E7F1F6" BorderBrush="#2A6284" Click="ActiveLoansButton_Click"/>
-                    <Button x:Name="BookReturnsButton" Content="Book Returns" Height="36" Margin="0,0,0,8" Background="Transparent" Foreground="#E7F1F6" BorderBrush="#2A6284" Click="BookReturnsButton_Click"/>
-                    <Button x:Name="OverdueBooksButton" Content="Overdue Books" Height="36" Margin="0,0,0,8" Background="Transparent" Foreground="#E7F1F6" BorderBrush="#2A6284" Click="OverdueBooksButton_Click"/>
-                    <Button x:Name="PenaltiesButton" Content="Penalties" Height="36" Margin="0,0,0,8" Background="Transparent" Foreground="#E7F1F6" BorderBrush="#2A6284" Click="PenaltiesButton_Click"/>
-                    <Button x:Name="ManageBooksButton" Content="Manage Books" Height="36" Margin="0,0,0,8" Background="Transparent" Foreground="#E7F1F6" BorderBrush="#2A6284" Click="ManageBooksButton_Click"/>
-                    <Button x:Name="BorrowersButton" Content="Borrowers" Height="36" Margin="0,0,0,8" Background="Transparent" Foreground="#E7F1F6" BorderBrush="#2A6284" Click="BorrowersButton_Click"/>
-                    <Button x:Name="NotificationsButton" Content="Notifications" Height="36" Margin="0,0,0,8" Background="Transparent" Foreground="#E7F1F6" BorderBrush="#2A6284" Click="NotificationsButton_Click"/>
-                    <Button x:Name="ReportsButton" Content="Reports" Height="36" Margin="0,0,0,8" Background="Transparent" Foreground="#E7F1F6" BorderBrush="#2A6284" Click="ReportsButton_Click"/>
-                    <Button x:Name="UserManagementButton" Height="36" Margin="0,10,0,8" Background="Transparent" Foreground="#9AB7C9" BorderBrush="#2A6284" Click="UserManagementButton_Click">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="User Management (Admin)" VerticalAlignment="Center"/>
-                            <Border x:Name="PendingUsersBadge" Width="20" Height="20" Margin="8,0,0,0" CornerRadius="10" Background="#F4C542" Visibility="Collapsed" VerticalAlignment="Center">
-                                <TextBlock x:Name="PendingUsersCountText" Text="0" Foreground="#3D310A" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="AuditLogsButton" Content="Audit Logs (Admin)" Height="36" Margin="0,0,0,8" Background="Transparent" Foreground="#9AB7C9" BorderBrush="#2A6284" Click="AuditLogsButton_Click"/>
-                    <Button x:Name="SettingsButton" Content="Settings (Admin)" Height="36" Margin="0,0,0,18" Background="Transparent" Foreground="#9AB7C9" BorderBrush="#2A6284" Click="SettingsButton_Click"/>
-                    <Button x:Name="SignOutButton" Content="Sign Out" Height="38" Background="#A11D1D" Foreground="White" BorderThickness="0" Click="SignOutButton_Click"/>
+                    </Grid>
+                    <Button x:Name="SignOutButton"
+                            Content="Sign out"
+                            Height="40"
+                            HorizontalContentAlignment="Center"
+                            Background="#B23A3A"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Click="SignOutButton_Click"/>
+                    <views:ConnectionStatusControl Margin="0,12,0,0"/>
                 </StackPanel>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              KeyboardNavigation.TabNavigation="Continue">
+                    <StackPanel Margin="14,0">
+                        <Button x:Name="DashboardButton" Style="{StaticResource SidebarButtonStyle}" Click="DashboardButton_Click" AutomationProperties.Name="Dashboard">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Dashboard" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                        <Button x:Name="BorrowRequestsButton" Style="{StaticResource SidebarButtonStyle}" Click="BorrowRequestsButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8A7;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1" VerticalAlignment="Center"/>
+                                <TextBlock Text="Borrow requests" VerticalAlignment="Center"/>
+                                <Border x:Name="PendingRequestsBadge" MinWidth="21" Height="20" Margin="9,0,0,0" Padding="5,0" CornerRadius="10" Background="{StaticResource AccentBrush}" Visibility="Collapsed" VerticalAlignment="Center">
+                                    <TextBlock x:Name="PendingRequestsCountText" Text="0" Foreground="#28444A" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="ActiveLoansButton" Style="{StaticResource SidebarButtonStyle}" Click="ActiveLoansButton_Click" AutomationProperties.Name="Active loans">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Active loans" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                        <Button x:Name="BookReturnsButton" Style="{StaticResource SidebarButtonStyle}" Click="BookReturnsButton_Click" AutomationProperties.Name="Book returns">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Book returns" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                        <Button x:Name="OverdueBooksButton" Style="{StaticResource SidebarButtonStyle}" Click="OverdueBooksButton_Click" AutomationProperties.Name="Overdue books">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE787;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Overdue books" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                        <Button x:Name="PenaltiesButton" Style="{StaticResource SidebarButtonStyle}" Click="PenaltiesButton_Click" AutomationProperties.Name="Penalties">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8C7;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Penalties" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                        <Button x:Name="ManageBooksButton" Style="{StaticResource SidebarButtonStyle}" Click="ManageBooksButton_Click" AutomationProperties.Name="Browse books">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Browse books" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                        <Button x:Name="BorrowersButton" Style="{StaticResource SidebarButtonStyle}" Click="BorrowersButton_Click" AutomationProperties.Name="Borrowers">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Borrowers" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                        <Button x:Name="NotificationsButton" Style="{StaticResource SidebarButtonStyle}" Click="NotificationsButton_Click" AutomationProperties.Name="Notifications">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xEA8F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Notifications" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                        <Button x:Name="ReportsButton" Style="{StaticResource SidebarButtonStyle}" Click="ReportsButton_Click" AutomationProperties.Name="Reports">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE9D2;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Reports" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                        <Border Height="1" Margin="8,12,8,12" Background="#FFFFFF24"/>
+                        <Button x:Name="UserManagementButton" Style="{StaticResource SidebarButtonStyle}" Click="UserManagementButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1" VerticalAlignment="Center"/>
+                                <TextBlock Text="User management" VerticalAlignment="Center"/>
+                                <Border x:Name="PendingUsersBadge" MinWidth="21" Height="20" Margin="9,0,0,0" Padding="5,0" CornerRadius="10" Background="{StaticResource AccentBrush}" Visibility="Collapsed" VerticalAlignment="Center">
+                                    <TextBlock x:Name="PendingUsersCountText" Text="0" Foreground="#28444A" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="AuditLogsButton" Style="{StaticResource SidebarButtonStyle}" Click="AuditLogsButton_Click" AutomationProperties.Name="Audit logs">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Audit logs" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                        <Button x:Name="SettingsButton" Style="{StaticResource SidebarButtonStyle}" Click="SettingsButton_Click" AutomationProperties.Name="Settings">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Settings" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
             </DockPanel>
         </Border>
 
-        <ContentControl x:Name="MainContent"
-                        Grid.Column="1"
-                        Margin="24"/>
+        <Grid Grid.Column="1" Margin="34,22,38,32">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="58"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="0,0,0,18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="PCDS DIGITAL LIBRARY"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource PrimaryBrush}"/>
+                    <TextBlock Text="Library staff workspace"
+                               Margin="0,3,0,0"
+                               FontSize="12"
+                               Foreground="{StaticResource MutedBrush}"/>
+                </StackPanel>
+                <Border Grid.Column="1"
+                        Padding="13,8"
+                        BorderBrush="{StaticResource LineBrush}"
+                        BorderThickness="1"
+                        Background="White"
+                        CornerRadius="9">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="9" Height="9" Fill="{StaticResource PrimaryBrush}"/>
+                        <TextBlock x:Name="HeaderRoleText"
+                                   Text="STAFF"
+                                   Margin="8,0,0,0"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkBrush}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ContentControl x:Name="MainContent"/>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </Window>
