@@ -1,6 +1,10 @@
-# PCDS Library
+<p align="center">
+  <img src="docs/pcds-logo.png" alt="PCDS Library logo" width="160">
+</p>
 
-**A digital library and circulation system for Philippine Christian Discipleship School (PCDS).**
+<h1 align="center">PCDS Library</h1>
+
+<p align="center"><strong>A digital library and circulation system for Philippine Christian Discipleship School (PCDS).</strong></p>
 
 PCDS Library brings book discovery, borrowing, and library operations together in one system. Students and teachers can browse the collection and keep track of their requests and loans, while library staff can manage books, circulation, borrowers, and reports.
 
