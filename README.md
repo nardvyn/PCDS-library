@@ -6,6 +6,8 @@
 
 <p align="center"><strong>A digital library and circulation system for Philippine Christian Discipleship School (PCDS).</strong></p>
 
+<p align="center"><a href="https://pcds-library.vercel.app/"><strong>Visit the Live Library Portal →</strong></a></p>
+
 PCDS Library brings book discovery, borrowing, and library operations together in one system. Students and teachers can browse the collection and keep track of their requests and loans, while library staff can manage books, circulation, borrowers, and reports.
 
 ## Screenshots
