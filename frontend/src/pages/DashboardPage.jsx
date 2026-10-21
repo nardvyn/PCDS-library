@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { googleLogout } from '@react-oauth/google'
-import { Bell, BookOpen, BookOpenCheck, CalendarDays, ChevronRight, Clock3, History, LayoutDashboard, Library, LogOut, Menu, Search, UserRound, X } from 'lucide-react'
+import { Bell, BookOpen, BookOpenCheck, CalendarDays, Check, ChevronRight, Clock3, Eye, History, LayoutDashboard, Library, LogOut, Menu, Search, ShoppingCart, UserRound, X } from 'lucide-react'
 
 import api from '../services/api'
 import pcdsSeal from '../assets/pcds-seal.png'
@@ -9,7 +9,7 @@ import './DashboardPage.css'
 
 const initialSummary = { borrowed_books: 0, pending_requests: 0, overdue_books: 0, returned_books: 0, unread_notifications: 0, active_loans: [], recent_requests: [] }
 const sectionPaths = {
-  dashboard: '/dashboard', books: '/books', loans: '/my-loans', requests: '/my-requests',
+  dashboard: '/dashboard', books: '/books', loans: '/my-loans', dueSoon: '/my-loans', overdue: '/my-loans', requests: '/my-requests',
   history: '/history', notifications: '/notifications', profile: '/profile',
 }
 const pathSections = Object.fromEntries(Object.entries(sectionPaths).map(([section, path]) => [path, section]))
@@ -62,7 +62,8 @@ function DashboardPage() {
 
   function navigateTo(section) {
     setSidebarOpen(false)
-    navigate(sectionPaths[section] || '/dashboard')
+    const routeState = section === 'dueSoon' || section === 'overdue' ? { loanFilter: section } : {}
+    navigate(sectionPaths[section] || '/dashboard', { state: routeState })
     if (section === 'dashboard') loadDashboard()
   }
   function handleSignOut() {
@@ -91,7 +92,7 @@ function DashboardPage() {
         {activeSection !== 'dashboard' && <button className="mobile-menu-button section-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation menu"><Menu size={23} /></button>}
         {activeSection === 'dashboard' && <DashboardOverview user={user} firstName={firstName} summary={summary} loading={loading} error={dashboardError} onRetry={loadDashboard} borrowingPeriod={borrowingPeriod} isTeacher={isTeacher} onNavigate={navigateTo} setSidebarOpen={setSidebarOpen} />}
         {activeSection === 'books' && <BrowseBooks user={user} profileVerified={summary.verification_status === 'VERIFIED'} onRequestSubmitted={loadDashboard} />}
-        {activeSection === 'loans' && <LoansSection summary={summary} loading={loading} onNavigate={navigateTo} />}
+        {activeSection === 'loans' && <LoansSection key={location.state?.loanFilter || 'all'} summary={summary} loading={loading} onNavigate={navigateTo} initialFilter={location.state?.loanFilter || 'all'} />}
         {activeSection === 'requests' && <RequestsSection summary={summary} onNavigate={navigateTo} />}
         {activeSection === 'history' && <HistorySection summary={summary} />}
         {activeSection === 'notifications' && <NotificationsSection onUnreadCountChange={updateUnreadNotifications} />}
@@ -102,19 +103,35 @@ function DashboardPage() {
 }
 
 function DashboardOverview({ user, firstName, summary, loading, error, onRetry, borrowingPeriod, isTeacher, onNavigate, setSidebarOpen }) {
+  const dueSoonCount = summary.active_loans.filter((loan) => {
+    const timing = getLoanTiming(loan)
+    return timing && !timing.isOverdue && timing.daysRemaining <= 3
+  }).length
+  const dayLabel = borrowingPeriod === 1 ? 'day' : 'days'
   return <>
     <header className="dashboard-header"><button className="mobile-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open menu"><Menu size={23} /></button><div><p className="header-label">PCDS DIGITAL LIBRARY</p><h2>Good day, {firstName}!</h2><p className="header-description">Search books and monitor your borrowing activity.</p></div><div className="header-actions"><button className="notification-button" onClick={() => onNavigate('notifications')} aria-label="Open notifications"><Bell size={20} />{summary.unread_notifications > 0 && <span className="notification-dot" />}</button><div className="header-profile"><div className="header-avatar">{firstName.charAt(0).toUpperCase()}</div><div><strong>{user.full_name || 'Library User'}</strong><span>{user.role || 'STUDENT'}</span></div></div></div></header>
     {error && <div className="catalog-message error" role="alert">{error} <button type="button" className="text-action-button" onClick={onRetry}>Try again</button></div>}
-    <section className="summary-grid"><SummaryCard icon={<BookOpenCheck size={22} />} label="Currently borrowed" value={summary.borrowed_books} color="blue" onClick={() => onNavigate('loans')} /><SummaryCard icon={<Clock3 size={22} />} label="Pending requests" value={summary.pending_requests} color="orange" onClick={() => onNavigate('requests')} /><SummaryCard icon={<CalendarDays size={22} />} label="Overdue books" value={summary.overdue_books} color="red" onClick={() => onNavigate('loans')} /><SummaryCard icon={<History size={22} />} label="Books returned" value={summary.returned_books} color="green" onClick={() => onNavigate('history')} /></section>
+    <section className="summary-grid">
+      <SummaryCard icon={<BookOpenCheck size={22} />} label="Currently borrowed" value={summary.borrowed_books} color="blue" onClick={() => onNavigate('loans')} />
+      <SummaryCard icon={<Clock3 size={22} />} label="Pending requests" value={summary.pending_requests} color="orange" onClick={() => onNavigate('requests')} />
+      <SummaryCard icon={<CalendarDays size={22} />} label="Due soon · 3 days" value={dueSoonCount} color="orange" onClick={() => onNavigate('dueSoon')} />
+      <SummaryCard icon={<CalendarDays size={22} />} label="Overdue books" value={summary.overdue_books} color="red" onClick={() => onNavigate('overdue')} />
+      <SummaryCard icon={<History size={22} />} label="Books returned" value={summary.returned_books} color="green" onClick={() => onNavigate('history')} />
+    </section>
     <section className="dashboard-content-grid">
       <div className="dashboard-panel">
         <div className="panel-heading">
-          <div><h3>Currently borrowed</h3><p>Books that are currently under your account</p></div>
-          <button className="text-action-button" onClick={() => onNavigate('loans')}>View all <ChevronRight size={17} /></button>
+          <div>
+            <h3>{summary.active_loans.length ? 'Currently borrowed' : 'Recent activity'}</h3>
+            <p>{summary.active_loans.length ? 'Books that are currently under your account' : 'Your latest borrowing request updates'}</p>
+          </div>
+          <button className="text-action-button" onClick={() => onNavigate(summary.active_loans.length ? 'loans' : 'requests')}>{summary.active_loans.length ? 'View all' : 'View requests'} <ChevronRight size={17} /></button>
         </div>
         {loading ? <DashboardLoading /> : summary.active_loans.length > 0
           ? <div className="loan-list">{summary.active_loans.slice(0, 3).map((loan) => <LoanItem key={loan.loan_id} loan={loan} />)}</div>
-          : <EmptyState icon={<Library size={30} />} title="No borrowed books" description="Browse the collection and send your first borrowing request." buttonText="Browse books" onClick={() => onNavigate('books')} />}
+          : summary.recent_requests?.length > 0
+            ? <div className="recent-activity-list">{summary.recent_requests.slice(0, 4).map((request) => <RequestItem key={request.request_id} request={request} />)}</div>
+            : <EmptyState icon={<Library size={30} />} title="No borrowed books" description="Browse the collection and send your first borrowing request." buttonText="Browse books" onClick={() => onNavigate('books')} />}
       </div>
       <div className="right-panel-column">
         <div className="dashboard-panel">
@@ -124,14 +141,14 @@ function DashboardOverview({ user, firstName, summary, loading, error, onRetry, 
             <AccountRow label="Verification" value={summary.verification_status || 'PENDING_VERIFICATION'} valueClass={summary.verification_status === 'VERIFIED' ? 'active-status' : ''} />
             <AccountRow label="Account role" value={user.role || 'STUDENT'} />
             <AccountRow label="School ID" value={user.school_id || 'Not available'} />
-            <AccountRow label="Borrowing period" value={`${borrowingPeriod} days`} />
+            <AccountRow label="Borrowing period" value={`${borrowingPeriod} ${dayLabel}`} />
           </div>
         </div>
         <div className="borrowing-reminder">
           <div className="reminder-icon"><CalendarDays size={23} /></div>
           <div>
             <h3>Borrowing reminder</h3>
-            <p>{isTeacher ? 'Teachers' : 'Students'} may borrow books for up to {borrowingPeriod} days. Return books on time to avoid a ₱{Number(summary.daily_penalty ?? 10).toLocaleString('en-PH', { maximumFractionDigits: 2 })} daily penalty.</p>
+            <p>{isTeacher ? 'Teachers' : 'Students'} may borrow books for up to {borrowingPeriod} {dayLabel}. Return books on time to avoid a ₱{Number(summary.daily_penalty ?? 10).toLocaleString('en-PH', { maximumFractionDigits: 2 })} daily penalty.</p>
           </div>
         </div>
       </div>
@@ -144,15 +161,18 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
   const [books, setBooks] = useState([])
   const [search, setSearch] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [availableOnly, setAvailableOnly] = useState(false)
+  const [sortOrder, setSortOrder] = useState('title-asc')
   const [catalogReloadKey, setCatalogReloadKey] = useState(0)
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState('')
-  const [requestingBookId, setRequestingBookId] = useState(null)
+  const [cartBooks, setCartBooks] = useState([])
+  const [cartSubmitting, setCartSubmitting] = useState(false)
   const [requestedBookIds, setRequestedBookIds] = useState([])
-  const [form, setForm] = useState({ title: '', author: '', call_number: '', accession_number: '' })
-  const [bookPhoto, setBookPhoto] = useState(null)
-  const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
+  const [selectedBook, setSelectedBook] = useState(null)
+  const detailsDialogRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -172,49 +192,84 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
     return () => { cancelled = true }
   }, [searchTerm, catalogReloadKey])
 
-  function updateForm(event) {
-    const { name, value } = event.target
-    setForm((current) => ({ ...current, [name]: value }))
+  useEffect(() => {
+    const dialog = detailsDialogRef.current
+    if (!dialog || !selectedBook) return undefined
+    dialog.showModal()
+    return () => {
+      if (dialog.open) dialog.close()
+    }
+  }, [selectedBook])
+
+  const categories = useMemo(
+    () => [...new Set(books.map((book) => book.category).filter(Boolean))].sort((left, right) => left.localeCompare(right)),
+    [books],
+  )
+  const filteredBooks = useMemo(() => {
+    const result = books
+      .filter((book) => !categoryFilter || book.category === categoryFilter)
+      .filter((book) => !availableOnly || book.available_copies > 0)
+    result.sort((left, right) => {
+      if (sortOrder === 'title-desc') return right.title.localeCompare(left.title)
+      if (sortOrder === 'newest') return (right.publication_year || 0) - (left.publication_year || 0) || left.title.localeCompare(right.title)
+      return left.title.localeCompare(right.title)
+    })
+    return result
+  }, [availableOnly, books, categoryFilter, sortOrder])
+
+  function toggleCartBook(book) {
+    setMessage(null)
+    setCartBooks((current) => current.some((item) => item.book_id === book.book_id)
+      ? current.filter((item) => item.book_id !== book.book_id)
+      : [...current, book])
   }
 
-  async function submitRequest(event) {
-    event.preventDefault()
-    setMessage(null)
-    if (!bookPhoto) {
-      setMessage({ type: 'error', text: 'Choose a clear photo of the requested book.' })
-      return
-    }
-
-    const requestData = new FormData()
-    Object.entries(form).forEach(([key, value]) => requestData.append(key, value.trim()))
-    requestData.append('book_image', bookPhoto)
-    setLoading(true)
-    try {
-      const response = await api.post('/borrow-requests', requestData, { headers: { 'Content-Type': 'multipart/form-data' } })
-      setMessage({ type: 'success', text: response.data.message })
-      setForm({ title: '', author: '', call_number: '', accession_number: '' })
-      setBookPhoto(null)
-      event.target.reset()
-      await onRequestSubmitted()
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Unable to submit the borrow request.' })
-    } finally {
-      setLoading(false)
-    }
+  function removeCartBook(bookId) {
+    setCartBooks((current) => current.filter((book) => book.book_id !== bookId))
   }
 
-  async function requestCatalogBook(book) {
+  async function submitCart() {
+    if (!cartBooks.length || cartSubmitting) return
     setMessage(null)
-    setRequestingBookId(book.book_id)
+    setCartSubmitting(true)
+    const submittedBookIds = []
+    const failures = []
     try {
-      const response = await api.post('/borrow-requests', { book_id: book.book_id })
-      setRequestedBookIds((current) => [...current, book.book_id])
-      setMessage({ type: 'success', text: response.data.message })
-      await onRequestSubmitted()
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Unable to submit the borrow request.' })
+      for (const book of cartBooks) {
+        try {
+          await api.post('/borrow-requests', { book_id: book.book_id })
+          submittedBookIds.push(book.book_id)
+        } catch (error) {
+          failures.push({
+            title: book.title,
+            reason: error.response?.data?.message || 'Unable to submit this borrow request.',
+          })
+        }
+      }
+
+      if (submittedBookIds.length) {
+        setRequestedBookIds((current) => [...new Set([...current, ...submittedBookIds])])
+        setCartBooks((current) => current.filter((book) => !submittedBookIds.includes(book.book_id)))
+        await onRequestSubmitted()
+      }
+
+      if (failures.length) {
+        const submittedCount = submittedBookIds.length
+        const submittedMessage = submittedCount
+          ? `${submittedCount} ${submittedCount === 1 ? 'request was' : 'requests were'} submitted. `
+          : ''
+        setMessage({
+          type: 'error',
+          text: `${submittedMessage}Unable to submit: ${failures.map(({ title, reason }) => `${title} — ${reason}`).join(' ')}`,
+        })
+      } else {
+        setMessage({
+          type: 'success',
+          text: `${submittedBookIds.length} ${submittedBookIds.length === 1 ? 'borrow request was' : 'borrow requests were'} submitted.`,
+        })
+      }
     } finally {
-      setRequestingBookId(null)
+      setCartSubmitting(false)
     }
   }
 
@@ -226,47 +281,160 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
     {message && <div className={`catalog-message ${message.type}`} role="status">{message.text}</div>}
     <form className="catalog-search" onSubmit={(event) => { event.preventDefault(); setCatalogLoading(true); setSearchTerm(search.trim()); setCatalogReloadKey((current) => current + 1) }}>
       <Search size={19} aria-hidden="true" />
-      <input aria-label="Search books" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by title, author, ISBN, or accession number" />
+      <input aria-label="Search books" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by title, author, ISBN, accession number, or subject" />
       <button type="submit">Search</button>
     </form>
+    <div className="catalog-toolbar" aria-label="Catalog filters and sorting">
+      <label className="catalog-filter-field">
+        <span>Category</span>
+        <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+          <option value="">All categories</option>
+          {categories.map((category) => <option value={category} key={category}>{category}</option>)}
+        </select>
+      </label>
+      <label className="available-filter">
+        <input type="checkbox" checked={availableOnly} onChange={(event) => setAvailableOnly(event.target.checked)} />
+        <span>Available only</span>
+      </label>
+      <label className="catalog-filter-field catalog-sort-field">
+        <span>Sort by</span>
+        <select aria-label="Sort books" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+          <option value="title-asc">Title A–Z</option>
+          <option value="title-desc">Title Z–A</option>
+          <option value="newest">Publication year: newest</option>
+        </select>
+      </label>
+    </div>
+    <section className="borrow-cart" aria-label="Borrow request cart">
+      <div className="borrow-cart-heading">
+        <div className="borrow-cart-icon"><ShoppingCart size={20} aria-hidden="true" /></div>
+        <div className="borrow-cart-summary">
+          <h3>Your request cart <span>{cartBooks.length}</span></h3>
+          <p>{cartBooks.length ? 'Review your picks before sending your requests.' : 'Add available books here before submitting your borrow requests.'}</p>
+        </div>
+        <button className="submit-cart-button" type="button" onClick={submitCart} disabled={!canRequest || !profileVerified || cartSubmitting || cartBooks.length === 0}>
+          {cartSubmitting ? 'Submitting...' : cartBooks.length ? `Submit ${cartBooks.length} ${cartBooks.length === 1 ? 'request' : 'requests'}` : 'Cart is empty'}
+        </button>
+      </div>
+      {cartBooks.length > 0 && <ul className="borrow-cart-items">
+        {cartBooks.map((book) => <li key={book.book_id}>
+          <div><strong>{book.title}</strong><span>Accession No. {book.accession_number}</span></div>
+          <button type="button" onClick={() => removeCartBook(book.book_id)} disabled={cartSubmitting} aria-label={`Remove ${book.title} from cart`}><X size={18} aria-hidden="true" /></button>
+        </li>)}
+      </ul>}
+    </section>
     {catalogError && <div className="catalog-message error" role="alert">{catalogError} <button type="button" className="text-action-button" onClick={() => { setCatalogLoading(true); setCatalogReloadKey((current) => current + 1) }}>Try again</button></div>}
-    {catalogLoading ? <div className="dashboard-panel section-placeholder"><DashboardLoading /></div> : books.length > 0
-      ? <div className="book-catalog">{books.map((book) => {
+    {catalogLoading ? <div className="dashboard-panel section-placeholder"><DashboardLoading /></div> : filteredBooks.length > 0
+      ? <div className="book-catalog" aria-live="polite">{filteredBooks.map((book) => {
         const unavailable = book.available_copies < 1
         const alreadyRequested = requestedBookIds.includes(book.book_id)
+        const inCart = cartBooks.some((item) => item.book_id === book.book_id)
         return <article className="book-card" key={book.book_id}>
-          <div className="book-card-icon"><BookOpen size={23} /></div>
+          <BookCover book={book} />
           <div className="book-card-details">
             <h3>{book.title}</h3>
             <p>{book.author}{book.publication_year ? ` · ${book.publication_year}` : ''}</p>
-            <span>Accession No. {book.accession_number}{book.call_number ? ` · Call No. ${book.call_number}` : ''}</span>
-            <strong className={unavailable ? 'book-unavailable' : ''}>{unavailable ? 'Currently unavailable' : `${book.available_copies} ${book.available_copies === 1 ? 'copy' : 'copies'} available`}</strong>
+            {book.description && <p className="book-description">{book.description}</p>}
+            {book.category && <span className="book-category">{book.category}</span>}
+            <span className="book-identifiers">Accession No. {book.accession_number}{book.call_number ? ` · Call No. ${book.call_number}` : ''}</span>
+            <strong className={`book-availability ${unavailable ? 'book-unavailable' : ''}`}>{unavailable ? 'Currently borrowed' : `Available: ${book.available_copies} ${book.available_copies === 1 ? 'copy' : 'copies'}`}</strong>
           </div>
-          <button className="request-book-button" type="button" onClick={() => requestCatalogBook(book)} disabled={!canRequest || !profileVerified || unavailable || alreadyRequested || requestingBookId === book.book_id}>
-            {requestingBookId === book.book_id ? 'Requesting...' : alreadyRequested ? 'Requested' : 'Request book'}
-          </button>
+          <div className="book-card-actions">
+            <button className="book-details-button" type="button" onClick={() => setSelectedBook(book)}><Eye size={16} aria-hidden="true" /> View details</button>
+            <button className={`request-book-button add-to-cart-button ${inCart ? 'in-cart' : ''}`} type="button" onClick={() => toggleCartBook(book)} disabled={!canRequest || !profileVerified || unavailable || alreadyRequested || cartSubmitting}>
+              {alreadyRequested ? <><Check size={16} aria-hidden="true" /> Requested</> : inCart ? <><Check size={16} aria-hidden="true" /> In cart</> : <><ShoppingCart size={16} aria-hidden="true" /> Add to cart</>}
+            </button>
+          </div>
         </article>
       })}</div>
-      : <div className="dashboard-panel section-placeholder"><Library size={34} /><h3>No books found</h3><p>Try another title, author, ISBN, or call number.</p></div>}
-    <section className="manual-request-disclosure" aria-labelledby="manual-request-heading">
-      <div className="manual-request-heading">
-        <div>
-          <p className="manual-request-eyebrow">CAN'T FIND THE BOOK?</p>
-          <h3 id="manual-request-heading">Request a book not listed in the catalog</h3>
-          <p>Send the book details and a clear photo for the library staff to review.</p>
+      : <div className="dashboard-panel section-placeholder"><Library size={34} /><h3>No books found</h3><p>Try another search, choose a different category, or turn off “Available only”.</p></div>}
+    <dialog className="book-details-dialog" ref={detailsDialogRef} aria-labelledby="book-details-title" onClose={() => setSelectedBook(null)} onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close() }}>
+      {selectedBook && <>
+        <div className="book-details-dialog-header">
+          <div><p className="header-label">BOOK DETAILS</p><h2 id="book-details-title">{selectedBook.title}</h2></div>
+          <button className="book-details-close" type="button" onClick={() => detailsDialogRef.current?.close()} aria-label="Close book details"><X size={20} /></button>
         </div>
-      </div>
-      <form className="borrow-request-form" onSubmit={submitRequest}>
-        <div className="field"><label htmlFor="borrow-book-title">Title of the book</label><input id="borrow-book-title" name="title" value={form.title} onChange={updateForm} placeholder="Enter the book title" required /></div>
-        <div className="field"><label htmlFor="borrow-call-number">Call number</label><input id="borrow-call-number" name="call_number" value={form.call_number} onChange={updateForm} placeholder="e.g. Cir. 005.B" required /></div>
-        <div className="field-grid"><div className="field"><label htmlFor="borrow-accession">Accession number</label><input id="borrow-accession" name="accession_number" value={form.accession_number} onChange={updateForm} placeholder="e.g. 10,225" required /></div><div className="field"><label htmlFor="borrow-author">Author <span>Optional</span></label><input id="borrow-author" name="author" value={form.author} onChange={updateForm} placeholder="Book author" /></div></div>
-        <div className="field"><label htmlFor="borrow-book-photo">Picture of the book</label><input id="borrow-book-photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setBookPhoto(event.target.files?.[0] || null)} required /><span className="form-help">JPG, PNG, or WebP. The photo is sent privately for staff review.</span></div>
-        <button className="request-book-button borrow-submit" type="submit" disabled={!canRequest || !profileVerified || loading}>{loading ? 'Submitting request...' : 'Submit borrow request'}</button>
-      </form>
-    </section>
+        <div className="book-details-dialog-body">
+          <BookCover book={selectedBook} />
+          <div className="book-details-content">
+            <p className="book-details-author">{selectedBook.author}{selectedBook.publication_year ? ` · ${selectedBook.publication_year}` : ''}</p>
+            <p className={`book-details-availability ${selectedBook.available_copies > 0 ? 'available' : 'unavailable'}`}>
+              {selectedBook.available_copies > 0 ? `Available: ${selectedBook.available_copies} ${selectedBook.available_copies === 1 ? 'copy' : 'copies'}` : 'Currently borrowed'}
+            </p>
+            <dl className="book-details-metadata">
+              <div><dt>Category / subject</dt><dd>{selectedBook.category || 'Not specified'}</dd></div>
+              <div><dt>Call number</dt><dd>{selectedBook.call_number || 'Not specified'}</dd></div>
+              <div><dt>Accession number</dt><dd>{selectedBook.accession_number || 'Not specified'}</dd></div>
+              <div><dt>ISBN</dt><dd>{selectedBook.isbn || 'Not specified'}</dd></div>
+              <div><dt>Copies</dt><dd>{selectedBook.available_copies} available of {selectedBook.total_copies}</dd></div>
+            </dl>
+            <section className="book-details-description"><h3>Description</h3><p>{selectedBook.description || 'No description is available for this book yet.'}</p></section>
+          </div>
+        </div>
+      </>}
+    </dialog>
   </>
 }
-function LoansSection({ summary, loading, onNavigate }) { return <><SectionHeader title="My Borrowed Books" description="Track active loans and due dates from your account." icon={<BookOpenCheck size={24} />} /><div className="dashboard-panel section-list-panel">{loading ? <DashboardLoading /> : summary.active_loans.length ? summary.active_loans.map((loan) => <LoanItem key={loan.loan_id} loan={loan} />) : <EmptyState icon={<Library size={30} />} title="No borrowed books" description="You do not have any active loans." buttonText="Browse books" onClick={() => onNavigate('books')} />}</div></> }
+
+function BookCover({ book }) {
+  const [coverUrl, setCoverUrl] = useState('')
+
+  useEffect(() => {
+    if (!book.cover_image) return undefined
+
+    let cancelled = false
+    let objectUrl
+    api.get(`/books/${book.book_id}/cover-image`, { responseType: 'blob' })
+      .then(({ data }) => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(data)
+        setCoverUrl(objectUrl)
+      })
+      .catch((error) => {
+        if (error.response?.status !== 404) console.error(`Unable to load the cover image for "${book.title}".`, error)
+      })
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [book.book_id, book.cover_image, book.title])
+
+  if (book.cover_image && coverUrl) return <div className="book-card-cover book-card-cover-image"><img src={coverUrl} alt={`Cover of ${book.title} by ${book.author}`} loading="lazy" /></div>
+  return <div className="book-card-cover book-card-cover-image book-card-default-cover">
+    <img src="/pcds-library-icon.png" alt={`Default PCDS Library cover for ${book.title}`} loading="lazy" />
+  </div>
+}
+function LoansSection({ summary, loading, onNavigate, initialFilter }) {
+  const loans = summary.active_loans.filter((loan) => {
+    const timing = getLoanTiming(loan)
+    if (initialFilter === 'overdue') return timing?.isOverdue
+    if (initialFilter === 'dueSoon') return timing && !timing.isOverdue && timing.daysRemaining <= 3
+    return true
+  })
+  const filterLabels = { all: 'all active loans', dueSoon: 'books due within 3 days', overdue: 'overdue books' }
+  return <>
+    <SectionHeader title="My Borrowed Books" description="Track active loans and due dates from your account." icon={<BookOpenCheck size={24} />} />
+    <div className="loan-filter-toolbar">
+      <label htmlFor="loan-list-filter">Show</label>
+      <select id="loan-list-filter" value={initialFilter} onChange={(event) => onNavigate(event.target.value === 'all' ? 'loans' : event.target.value)}>
+        <option value="all">All active loans</option>
+        <option value="dueSoon">Due within 3 days</option>
+        <option value="overdue">Overdue</option>
+      </select>
+    </div>
+    <div className="dashboard-panel section-list-panel">
+      {loading ? <DashboardLoading /> : loans.length
+        ? <>{initialFilter !== 'all' && <p className="loan-filter-result">{loans.length} {filterLabels[initialFilter]}.</p>}{loans.map((loan) => <LoanItem key={loan.loan_id} loan={loan} />)}</>
+        : <EmptyState
+          icon={<Library size={30} />}
+          title={initialFilter === 'overdue' ? 'No overdue books' : initialFilter === 'dueSoon' ? 'Nothing due soon' : 'No borrowed books'}
+          description={initialFilter === 'all' ? 'You do not have any active loans.' : 'There are no books in this category right now.'}
+          buttonText={initialFilter === 'all' ? 'Browse books' : 'View all loans'}
+          onClick={() => initialFilter === 'all' ? onNavigate('books') : onNavigate('loans')}
+        />}
+    </div>
+  </>
+}
 function RequestsSection({ summary, onNavigate }) { return <><SectionHeader title="My Requests" description="Review the status of your borrowing requests." icon={<Clock3 size={24} />} /><div className="dashboard-panel section-list-panel">{summary.recent_requests?.length ? summary.recent_requests.map((request) => <RequestItem key={request.request_id} request={request} />) : <EmptyState icon={<Clock3 size={30} />} title="No borrow requests yet" description="Browse the catalog to request an available book." buttonText="Browse books" onClick={() => onNavigate('books')} />}</div></> }
 function HistorySection({ summary }) { return <><SectionHeader title="Borrowing History" description="See the books you have previously returned." icon={<History size={24} />} /><div className="dashboard-panel section-list-panel">{summary.recent_returns?.length ? summary.recent_returns.map((loan) => <LoanItem key={loan.loan_id} loan={{ ...loan, due_date: loan.returned_at }} />) : <div className="section-placeholder"><History size={34} /><h3>No returned books yet</h3><p>Returned books will appear in your history.</p></div>}</div></> }
 function NotificationsSection({ onUnreadCountChange }) {
@@ -339,7 +507,7 @@ function ProfileSection({ user, summary, borrowingPeriod, onProfileUpdated }) {
       <AccountRow label="School ID" value={user.school_id || 'Not available'} />
       <AccountRow label="Phone number" value={user.contact_number || 'Not available'} />
       <AccountRow label="Verification" value={summary.verification_status || 'PENDING_VERIFICATION'} />
-      <AccountRow label="Borrowing period" value={`${borrowingPeriod} days`} />
+      <AccountRow label="Borrowing period" value={`${borrowingPeriod} ${borrowingPeriod === 1 ? 'day' : 'days'}`} />
     </div>
     {canReplaceSchoolId && <section className="dashboard-panel school-id-reupload">
       <h3>School ID photo unavailable</h3>
@@ -356,7 +524,39 @@ function ProfileSection({ user, summary, borrowingPeriod, onProfileUpdated }) {
 
 function SummaryCard({ icon, label, value, color, onClick }) { return <button className="summary-card" onClick={onClick}><div className={`summary-icon ${color}`}>{icon}</div><div><span>{label}</span><strong>{value}</strong></div><ChevronRight size={18} className="summary-arrow" /></button> }
 function AccountRow({ label, value, valueClass = '' }) { return <div className="account-row"><span>{label}</span><strong className={valueClass}>{value}</strong></div> }
-function LoanItem({ loan }) { const dueDate = new Date(loan.due_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }); return <div className="loan-item"><div className="loan-book-icon"><BookOpen size={21} /></div><div className="loan-information"><strong>{loan.book_title}</strong><span>Accession No. {loan.accession_number}</span></div><div className="loan-due-date"><span>Due date</span><strong>{dueDate}</strong></div></div> }
+function getLoanTiming(loan) {
+  const dueDate = new Date(loan.due_date)
+  if (!loan.due_date || Number.isNaN(dueDate.getTime())) return null
+  const difference = dueDate.getTime() - Date.now()
+  return {
+    dueDate,
+    isOverdue: difference < 0,
+    daysRemaining: Math.max(0, Math.ceil(difference / 86_400_000)),
+    daysOverdue: Math.max(1, Math.ceil(Math.abs(difference) / 86_400_000)),
+  }
+}
+
+function LoanItem({ loan }) {
+  const timing = getLoanTiming(loan)
+  const dueDateLabel = timing
+    ? timing.dueDate.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'Due date unavailable'
+  const timingLabel = !timing
+    ? ''
+    : timing.isOverdue
+      ? `Overdue by ${timing.daysOverdue} ${timing.daysOverdue === 1 ? 'day' : 'days'}`
+      : timing.daysRemaining === 0
+        ? 'Due today'
+        : `Due in ${timing.daysRemaining} ${timing.daysRemaining === 1 ? 'day' : 'days'}`
+  return <div className={`loan-item ${timing?.isOverdue ? 'loan-item-overdue' : ''}`}>
+    <div className="loan-book-icon"><BookOpen size={21} /></div>
+    <div className="loan-information"><strong>{loan.book_title}</strong><span>Accession No. {loan.accession_number}</span></div>
+    <div className={`loan-due-date ${timing?.isOverdue ? 'overdue' : timing?.daysRemaining <= 3 ? 'due-soon' : ''}`}>
+      <span>Due date</span><strong>{dueDateLabel}</strong>
+      {timingLabel && <span className="loan-timing-label" role="status">{timingLabel}</span>}
+    </div>
+  </div>
+}
 function RequestItem({ request }) { const requestedAt = new Date(request.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }); return <div className="loan-item"><div className="loan-book-icon"><Clock3 size={21} /></div><div className="loan-information"><strong>{request.book_title}</strong><span>Requested {requestedAt}</span></div><div className={`request-status ${request.status.toLowerCase()}`}>{request.status}</div></div> }
 function EmptyState({ icon, title, description, buttonText, onClick }) { return <div className="dashboard-empty-state"><div className="empty-state-icon">{icon}</div><h4>{title}</h4><p>{description}</p><button onClick={onClick}>{buttonText}</button></div> }
 function DashboardLoading() { return <div className="dashboard-loading">Loading your library information...</div> }

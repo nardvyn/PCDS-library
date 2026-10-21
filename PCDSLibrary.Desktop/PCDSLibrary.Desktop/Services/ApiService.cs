@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -173,6 +174,122 @@ namespace PCDSLibrary.Desktop.Services
                     Success = false,
                     Message = error.Message
                 };
+            }
+        }
+
+        public async Task<BookResponse> UpdateBookAsync(int bookId, CreateBookRequest request)
+        {
+            try
+            {
+                using var response = await _httpClient.PutAsJsonAsync($"books/{bookId}", request);
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound &&
+                    response.Content.Headers.ContentType?.MediaType != "application/json")
+                {
+                    return new BookResponse
+                    {
+                        Success = false,
+                        Message = "The connected library server does not support book editing yet. Deploy the updated backend and try again."
+                    };
+                }
+
+                return await response.Content.ReadFromJsonAsync<BookResponse>() ?? new BookResponse
+                {
+                    Success = false,
+                    Message = response.IsSuccessStatusCode
+                        ? "The server updated the book but returned an empty response."
+                        : $"The library server could not update the book (HTTP {(int)response.StatusCode})."
+                };
+            }
+            catch (HttpRequestException)
+            {
+                return new BookResponse
+                {
+                    Success = false,
+                    Message = "Cannot connect to the Flask server."
+                };
+            }
+            catch (Exception error)
+            {
+                return new BookResponse
+                {
+                    Success = false,
+                    Message = error.Message
+                };
+            }
+        }
+
+        public async Task<BookResponse> RemoveBookAsync(int bookId)
+        {
+            try
+            {
+                var response = await _httpClient.DeleteAsync($"books/{bookId}");
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound &&
+                    response.Content.Headers.ContentType?.MediaType != "application/json")
+                {
+                    return new BookResponse
+                    {
+                        Success = false,
+                        Message = "The connected library server does not support book removal yet. Deploy the updated backend and try again."
+                    };
+                }
+
+                var result = await response.Content.ReadFromJsonAsync<BookResponse>();
+                if (result != null)
+                    return result;
+
+                return new BookResponse
+                {
+                    Success = false,
+                    Message = response.IsSuccessStatusCode
+                        ? "The server removed the book but returned an empty response."
+                        : $"The library server could not remove the book (HTTP {(int)response.StatusCode})."
+                };
+            }
+            catch (HttpRequestException)
+            {
+                return new BookResponse
+                {
+                    Success = false,
+                    Message = "Cannot connect to the Flask server."
+                };
+            }
+            catch (Exception error)
+            {
+                return new BookResponse
+                {
+                    Success = false,
+                    Message = error.Message
+                };
+            }
+        }
+
+        public async Task<BookResponse> UploadBookCoverAsync(int bookId, string filePath)
+        {
+            try
+            {
+                await using var fileStream = File.OpenRead(filePath);
+                using var form = new MultipartFormDataContent();
+                using var imageContent = new StreamContent(fileStream);
+                var extension = Path.GetExtension(filePath).ToLowerInvariant();
+                imageContent.Headers.ContentType = new MediaTypeHeaderValue(extension switch
+                {
+                    ".png" => "image/png",
+                    ".webp" => "image/webp",
+                    _ => "image/jpeg"
+                });
+                form.Add(imageContent, "cover_image", Path.GetFileName(filePath));
+                using var response = await _httpClient.PostAsync($"books/{bookId}/cover-image", form);
+                return await response.Content.ReadFromJsonAsync<BookResponse>() ?? new BookResponse
+                {
+                    Success = false,
+                    Message = response.IsSuccessStatusCode
+                        ? "The server uploaded the cover but returned an empty response."
+                        : $"The library server could not upload the cover (HTTP {(int)response.StatusCode})."
+                };
+            }
+            catch (Exception error)
+            {
+                return new BookResponse { Success = false, Message = error.Message };
             }
         }
 

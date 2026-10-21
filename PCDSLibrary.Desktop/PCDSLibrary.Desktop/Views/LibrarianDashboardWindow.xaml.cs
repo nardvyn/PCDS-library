@@ -1,11 +1,13 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using PCDSLibrary.Desktop.Models;
 using PCDSLibrary.Desktop.Services;
 
@@ -17,6 +19,10 @@ namespace PCDSLibrary.Desktop.Views
         private readonly ApiService _apiService;
         private DataGrid _booksCatalogGrid = null!;
         private TextBlock _booksCatalogStatus = null!;
+        private Button _submitBookButton = null!;
+        private Button _cancelBookEditButton = null!;
+        private bool _isEditingBook;
+        private int? _editingBookId;
         private Border _bookDetailsPanel = null!;
         private Image _bookCoverImage = null!;
         private TextBlock _bookCoverStatus = null!;
@@ -24,6 +30,19 @@ namespace PCDSLibrary.Desktop.Views
         private TextBox _studentLoanDaysInput = null!;
         private TextBox _teacherLoanDaysInput = null!;
         private TextBox _dailyPenaltyInput = null!;
+        private TextBox _newBookTitleInput = null!;
+        private TextBox _newBookAuthorInput = null!;
+        private TextBox _newBookCategoryInput = null!;
+        private TextBox _newBookCallNumberInput = null!;
+        private TextBox _newBookAccessionInput = null!;
+        private TextBox _newBookIsbnInput = null!;
+        private TextBox _newBookPublicationYearInput = null!;
+        private TextBox _newBookCopiesInput = null!;
+        private TextBox _newBookDescriptionInput = null!;
+        private TextBlock _newBookStatus = null!;
+        private Image _newBookCoverPreview = null!;
+        private TextBlock _newBookCoverFileName = null!;
+        private string? _newBookCoverPath;
         private CheckBox _notificationsInput = null!;
         private DispatcherTimer? _pendingUsersTimer;
         private DispatcherTimer? _pendingRequestsTimer;
@@ -243,7 +262,7 @@ namespace PCDSLibrary.Desktop.Views
                 return;
             }
 
-            if (title == "Active Loans")
+            if (title == "Borrowed Books")
             {
                 content.Children.Add(CreateLoanListContent(false, false));
                 MainContent.Content = content;
@@ -361,7 +380,7 @@ namespace PCDSLibrary.Desktop.Views
             status.Text = $"{result.Loans.Count} record(s)";
             if (result.Loans.Count == 0)
             {
-                list.Children.Add(CreateRequestMessage(overdueOnly ? "No overdue books." : "No active loans." , "#547177"));
+                list.Children.Add(CreateRequestMessage(overdueOnly ? "No overdue books." : "No borrowed books." , "#547177"));
                 return;
             }
             foreach (var loan in result.Loans)
@@ -535,7 +554,7 @@ namespace PCDSLibrary.Desktop.Views
             status.Text = "Current library operations summary";
             grid.Children.Add(CreateMetric("Total book copies", report.TotalBooks.ToString()));
             grid.Children.Add(CreateMetric("Available copies", report.AvailableBooks.ToString()));
-            grid.Children.Add(CreateMetric("Active loans", report.BorrowedBooks.ToString()));
+            grid.Children.Add(CreateMetric("Borrowed books", report.BorrowedBooks.ToString()));
             grid.Children.Add(CreateMetric("Pending requests", report.PendingRequests.ToString()));
             grid.Children.Add(CreateMetric("Overdue books", report.OverdueBooks.ToString(), "#B42318"));
             grid.Children.Add(CreateMetric("Borrowers", report.Borrowers.ToString()));
@@ -1135,6 +1154,101 @@ namespace PCDSLibrary.Desktop.Views
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
+            var createBookContent = new StackPanel();
+            createBookContent.Children.Add(CreateSettingsSection(
+                "Add a book",
+                "Add titles to the catalog from the desktop library app."
+            ));
+            var fields = new Grid();
+            fields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            fields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var leftFields = new StackPanel { Margin = new Thickness(0, 0, 10, 0) };
+            _newBookTitleInput = AddBookField(leftFields, "Title *");
+            _newBookAuthorInput = AddBookField(leftFields, "Author *");
+            _newBookCategoryInput = AddBookField(leftFields, "Category");
+            _newBookCallNumberInput = AddBookField(leftFields, "Call number");
+            var rightFields = new StackPanel { Margin = new Thickness(10, 0, 0, 0) };
+            _newBookAccessionInput = AddBookField(rightFields, "Accession number *");
+            _newBookIsbnInput = AddBookField(rightFields, "ISBN");
+            _newBookPublicationYearInput = AddBookField(rightFields, "Publication year");
+            _newBookCopiesInput = AddBookField(rightFields, "Total copies");
+            _newBookCopiesInput.Text = "1";
+            _newBookDescriptionInput = AddBookField(rightFields, "Description");
+            rightFields.Children.Add(new TextBlock
+            {
+                Text = "Book cover image",
+                Margin = new Thickness(0, 0, 0, 5),
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold
+            });
+            var coverPicker = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
+            _newBookCoverPreview = new Image
+            {
+                Width = 72,
+                Height = 96,
+                Stretch = Stretch.UniformToFill,
+                Source = LoadPackImage("pack://application:,,,/Assets/pcds-seal.png")
+            };
+            coverPicker.Children.Add(new Border
+            {
+                Width = 74,
+                Height = 98,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                ClipToBounds = true,
+                Child = _newBookCoverPreview
+            });
+            var coverPickerActions = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            var uploadCoverButton = CreateSettingsButton("Upload image", "#176487");
+            uploadCoverButton.Click += (_, _) => ChooseBookCoverImage();
+            coverPickerActions.Children.Add(uploadCoverButton);
+            _newBookCoverFileName = new TextBlock
+            {
+                Text = "Default PCDS Library cover will be used.",
+                MaxWidth = 300,
+                Margin = new Thickness(0, 7, 0, 0),
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")),
+                FontSize = 11
+            };
+            coverPickerActions.Children.Add(_newBookCoverFileName);
+            coverPicker.Children.Add(coverPickerActions);
+            rightFields.Children.Add(coverPicker);
+            fields.Children.Add(leftFields);
+            Grid.SetColumn(rightFields, 1);
+            fields.Children.Add(rightFields);
+            createBookContent.Children.Add(fields);
+
+            var createBookActions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            _submitBookButton = CreateSettingsButton("Add to catalog", "#00899A");
+            _submitBookButton.Click += async (_, _) => await CreateCatalogBookAsync(_submitBookButton);
+            createBookActions.Children.Add(_submitBookButton);
+            _cancelBookEditButton = CreateSettingsButton("Cancel", "#547177");
+            _cancelBookEditButton.Margin = new Thickness(10, 0, 0, 0);
+            _cancelBookEditButton.Visibility = Visibility.Collapsed;
+            _cancelBookEditButton.Click += (_, _) => ResetBookEditor();
+            createBookActions.Children.Add(_cancelBookEditButton);
+            _newBookStatus = new TextBlock
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177"))
+            };
+            createBookActions.Children.Add(_newBookStatus);
+            createBookContent.Children.Add(createBookActions);
+
+            form.Children.Add(new Border
+            {
+                Margin = new Thickness(0, 0, 0, 16),
+                Padding = new Thickness(18),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F6FAFA")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Child = createBookContent
+            });
+
             _booksCatalogStatus = new TextBlock { Margin = new Thickness(0, 0, 0, 8), FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
             form.Children.Add(_booksCatalogStatus);
             _booksCatalogGrid = new DataGrid
@@ -1143,24 +1257,37 @@ namespace PCDSLibrary.Desktop.Views
                 IsReadOnly = true,
                 CanUserAddRows = false,
                 RowHeaderWidth = 0,
-                RowHeight = 30,
+                RowHeight = 54,
                 ColumnHeaderHeight = 32,
                 FontSize = 13,
                 MaxHeight = 560,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 Background = Brushes.White
             };
+            var coverThumbnail = new FrameworkElementFactory(typeof(Image));
+            coverThumbnail.SetBinding(Image.SourceProperty, new Binding(nameof(BookData.CoverThumbnail)));
+            coverThumbnail.SetValue(FrameworkElement.WidthProperty, 36d);
+            coverThumbnail.SetValue(FrameworkElement.HeightProperty, 44d);
+            coverThumbnail.SetValue(Image.StretchProperty, Stretch.UniformToFill);
+            coverThumbnail.SetValue(FrameworkElement.MarginProperty, new Thickness(4));
+            _booksCatalogGrid.Columns.Add(new DataGridTemplateColumn
+            {
+                Header = "Cover",
+                Width = 58,
+                CellTemplate = new DataTemplate { VisualTree = coverThumbnail }
+            });
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Title", Binding = new Binding(nameof(BookData.Title)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Author", Binding = new Binding(nameof(BookData.Author)), Width = new DataGridLength(1.3, DataGridLengthUnitType.Star) });
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Category", Binding = new Binding(nameof(BookData.Category)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Accession", Binding = new Binding(nameof(BookData.AccessionNumber)), Width = 130 });
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Available", Binding = new Binding(nameof(BookData.AvailableCopies)), Width = 80 });
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Total", Binding = new Binding(nameof(BookData.TotalCopies)), Width = 65 });
+            _booksCatalogGrid.Columns.Add(CreateBookActionsColumn());
             _booksCatalogGrid.SelectionChanged += async (_, _) => await ShowSelectedBookDetailsAsync();
             form.Children.Add(_booksCatalogGrid);
 
-            _bookCoverImage = new Image { Width = 120, Height = 160, Stretch = Stretch.Uniform, Visibility = Visibility.Collapsed };
-            _bookCoverStatus = new TextBlock { Text = "No cover photo available.", Width = 120, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")), VerticalAlignment = VerticalAlignment.Center };
+            _bookCoverImage = new Image { Width = 120, Height = 160, Stretch = Stretch.Uniform, Source = LoadPackImage("pack://application:,,,/Assets/pcds-seal.png") };
+            _bookCoverStatus = new TextBlock { Text = "Default PCDS Library cover", Width = 120, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")), VerticalAlignment = VerticalAlignment.Center };
             _bookDetailsContent = new TextBlock { MaxWidth = 500, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, FontSize = 13, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D")) };
             var coverColumn = new StackPanel { Width = 145, Margin = new Thickness(0, 0, 20, 0), HorizontalAlignment = HorizontalAlignment.Center };
             coverColumn.Children.Add(_bookCoverImage);
@@ -1183,6 +1310,288 @@ namespace PCDSLibrary.Desktop.Views
             return form;
         }
 
+        private DataGridTemplateColumn CreateBookActionsColumn()
+        {
+            var actions = new FrameworkElementFactory(typeof(StackPanel));
+            actions.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+            actions.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+            var editButton = new FrameworkElementFactory(typeof(Button));
+            editButton.SetValue(ContentControl.ContentProperty, "Edit");
+            editButton.SetValue(FrameworkElement.MinWidthProperty, 56d);
+            editButton.SetValue(FrameworkElement.MinHeightProperty, 28d);
+            editButton.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 8, 0));
+            editButton.SetValue(AutomationProperties.NameProperty, "Edit book");
+            editButton.AddHandler(Button.ClickEvent, new RoutedEventHandler(EditBookRow_Click));
+            actions.AppendChild(editButton);
+
+            var removeButton = new FrameworkElementFactory(typeof(Button));
+            removeButton.SetValue(ContentControl.ContentProperty, "Remove");
+            removeButton.SetValue(FrameworkElement.MinWidthProperty, 68d);
+            removeButton.SetValue(FrameworkElement.MinHeightProperty, 28d);
+            removeButton.SetValue(Control.ForegroundProperty, new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B42318")));
+            removeButton.SetValue(AutomationProperties.NameProperty, "Remove book");
+            removeButton.AddHandler(Button.ClickEvent, new RoutedEventHandler(RemoveBookRow_Click));
+            actions.AppendChild(removeButton);
+
+            return new DataGridTemplateColumn
+            {
+                Header = "Actions",
+                Width = 150,
+                CellTemplate = new DataTemplate { VisualTree = actions }
+            };
+        }
+
+        private void EditBookRow_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { DataContext: BookData book })
+                return;
+
+            _booksCatalogGrid.SelectedItem = book;
+            LoadBookForEditing(book);
+        }
+
+        private async void RemoveBookRow_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { DataContext: BookData book } button)
+                return;
+
+            _booksCatalogGrid.SelectedItem = book;
+            await RemoveBookAsync(book, button);
+        }
+
+        private async Task RemoveBookAsync(BookData book, Button removeButton)
+        {
+
+            var answer = MessageBox.Show(
+                $"Remove \"{book.Title}\" from the active catalog?\n\nIt will no longer appear in the website catalog. Existing loan history will be kept.",
+                "Remove Book from Catalog",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning
+            );
+            if (answer != MessageBoxResult.Yes)
+                return;
+
+            removeButton.IsEnabled = false;
+            _booksCatalogStatus.Text = $"Removing \"{book.Title}\" from the catalog...";
+            try
+            {
+                var result = await _apiService.RemoveBookAsync(book.BookId);
+                if (!result.Success)
+                {
+                    _booksCatalogStatus.Text = result.Message;
+                    MessageBox.Show(result.Message, "Remove Book", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                _bookDetailsPanel.Visibility = Visibility.Collapsed;
+                _booksCatalogGrid.SelectedItem = null;
+                await LoadBooksCatalogAsync();
+                MessageBox.Show(result.Message, "Remove Book", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            finally
+            {
+                removeButton.IsEnabled = true;
+            }
+        }
+
+        private void LoadBookForEditing(BookData book)
+        {
+            _editingBookId = book.BookId;
+            _isEditingBook = true;
+            _newBookTitleInput.Text = book.Title;
+            _newBookAuthorInput.Text = book.Author;
+            _newBookCategoryInput.Text = book.Category ?? "";
+            _newBookCallNumberInput.Text = book.CallNumber ?? "";
+            _newBookAccessionInput.Text = book.AccessionNumber;
+            _newBookIsbnInput.Text = book.Isbn ?? "";
+            _newBookPublicationYearInput.Text = book.PublicationYear?.ToString() ?? "";
+            _newBookCopiesInput.Text = book.TotalCopies.ToString();
+            _newBookCopiesInput.IsEnabled = false;
+            _newBookDescriptionInput.Text = book.Description ?? "";
+            _newBookCoverPath = null;
+            _newBookCoverFileName.Text = string.IsNullOrWhiteSpace(book.CoverImage)
+                ? "Default PCDS Library cover is currently used."
+                : "Current cover image. Choose another image to replace it.";
+            _newBookCoverPreview.Source = LoadPackImage("pack://application:,,,/Assets/pcds-seal.png");
+            _ = LoadEditorCoverPreviewAsync(book);
+            _submitBookButton.Content = "Save changes";
+            _cancelBookEditButton.Visibility = Visibility.Visible;
+            SetNewBookStatus($"Editing {book.Title}. Copy counts and cover photo are unchanged.", true);
+            _newBookTitleInput.Focus();
+        }
+
+        private void ResetBookEditor()
+        {
+            _editingBookId = null;
+            _isEditingBook = false;
+            _newBookTitleInput.Clear();
+            _newBookAuthorInput.Clear();
+            _newBookCategoryInput.Clear();
+            _newBookCallNumberInput.Clear();
+            _newBookAccessionInput.Clear();
+            _newBookIsbnInput.Clear();
+            _newBookPublicationYearInput.Clear();
+            _newBookCopiesInput.Text = "1";
+            _newBookCopiesInput.IsEnabled = true;
+            _newBookDescriptionInput.Clear();
+            _newBookCoverPath = null;
+            _newBookCoverPreview.Source = LoadPackImage("pack://application:,,,/Assets/pcds-seal.png");
+            _newBookCoverFileName.Text = "Default PCDS Library cover will be used.";
+            _submitBookButton.Content = "Add to catalog";
+            _cancelBookEditButton.Visibility = Visibility.Collapsed;
+            _newBookStatus.Text = "";
+        }
+
+        private async Task CreateCatalogBookAsync(Button addBookButton)
+        {
+            var title = _newBookTitleInput.Text.Trim();
+            var author = _newBookAuthorInput.Text.Trim();
+            var accessionNumber = _newBookAccessionInput.Text.Trim();
+            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(author) || string.IsNullOrWhiteSpace(accessionNumber))
+            {
+                SetNewBookStatus("Title, author, and accession number are required.", false);
+                return;
+            }
+
+            var totalCopies = 1;
+            if (!_isEditingBook && (!int.TryParse(_newBookCopiesInput.Text, out totalCopies) || totalCopies < 1))
+            {
+                SetNewBookStatus("Enter a valid total copy count of at least 1.", false);
+                return;
+            }
+
+            int? publicationYear = null;
+            if (!string.IsNullOrWhiteSpace(_newBookPublicationYearInput.Text))
+            {
+                if (!int.TryParse(_newBookPublicationYearInput.Text, out var year) || year < 1000 || year > 9999)
+                {
+                    SetNewBookStatus("Enter a valid four-digit publication year.", false);
+                    return;
+                }
+                publicationYear = year;
+            }
+
+            addBookButton.IsEnabled = false;
+            _newBookStatus.Text = _isEditingBook ? "Saving book details..." : "Adding book...";
+            try
+            {
+                var request = new CreateBookRequest
+                {
+                    Title = title,
+                    Author = author,
+                    AccessionNumber = accessionNumber,
+                    Category = _newBookCategoryInput.Text.Trim(),
+                    CallNumber = _newBookCallNumberInput.Text.Trim(),
+                    Isbn = _newBookIsbnInput.Text.Trim(),
+                    PublicationYear = publicationYear,
+                    TotalCopies = totalCopies,
+                    Description = _newBookDescriptionInput.Text.Trim()
+                };
+                var result = _isEditingBook && _editingBookId.HasValue
+                    ? await _apiService.UpdateBookAsync(_editingBookId.Value, request)
+                    : await _apiService.CreateBookAsync(request);
+
+                SetNewBookStatus(result.Message, result.Success);
+                if (!result.Success)
+                    return;
+
+                if (!string.IsNullOrWhiteSpace(_newBookCoverPath) && result.Book != null)
+                {
+                    var coverResult = await _apiService.UploadBookCoverAsync(result.Book.BookId, _newBookCoverPath);
+                    if (!coverResult.Success)
+                    {
+                        _editingBookId = result.Book.BookId;
+                        _isEditingBook = true;
+                        _submitBookButton.Content = "Save changes";
+                        _cancelBookEditButton.Visibility = Visibility.Visible;
+                        SetNewBookStatus($"Book details were saved, but the cover was not uploaded: {coverResult.Message}", false);
+                        await LoadBooksCatalogAsync();
+                        return;
+                    }
+                }
+
+                ResetBookEditor();
+                await LoadBooksCatalogAsync();
+            }
+            finally
+            {
+                addBookButton.IsEnabled = true;
+            }
+        }
+
+        private void SetNewBookStatus(string message, bool success)
+        {
+            _newBookStatus.Text = message;
+            _newBookStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(success ? "#24734C" : "#B42318"));
+        }
+
+        private void ChooseBookCoverImage()
+        {
+            var picker = new OpenFileDialog
+            {
+                Title = "Choose a book cover image",
+                Filter = "Supported images (*.jpg;*.jpeg;*.png;*.webp)|*.jpg;*.jpeg;*.png;*.webp",
+                Multiselect = false
+            };
+            if (picker.ShowDialog(this) != true)
+                return;
+
+            var file = new FileInfo(picker.FileName);
+            if (file.Length > 5 * 1024 * 1024)
+            {
+                SetNewBookStatus("The cover image must be no larger than 5 MB.", false);
+                return;
+            }
+
+            try
+            {
+                _newBookCoverPreview.Source = LoadFileImage(file.FullName);
+                _newBookCoverPath = file.FullName;
+                _newBookCoverFileName.Text = $"{file.Name} ({file.Length / 1024d:0.#} KB)";
+                SetNewBookStatus("Cover preview ready. Save the book to upload it.", true);
+            }
+            catch
+            {
+                SetNewBookStatus("That file could not be opened as an image. Choose a valid JPG, PNG, or WebP file.", false);
+            }
+        }
+
+        private async Task LoadEditorCoverPreviewAsync(BookData book)
+        {
+            if (string.IsNullOrWhiteSpace(book.CoverImage))
+                return;
+            var imageBytes = await _apiService.GetBookCoverImageAsync(book.BookId);
+            if (!_isEditingBook || _editingBookId != book.BookId || imageBytes == null)
+                return;
+            _newBookCoverPreview.Source = LoadImage(imageBytes);
+        }
+
+        private static BitmapImage LoadFileImage(string path)
+        {
+            using var stream = File.OpenRead(path);
+            return LoadImage(stream);
+        }
+
+        private static BitmapImage LoadImage(byte[] bytes)
+        {
+            using var stream = new MemoryStream(bytes);
+            return LoadImage(stream);
+        }
+
+        private static BitmapImage LoadImage(Stream stream)
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.StreamSource = stream;
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+
+        private static BitmapImage LoadPackImage(string uri) => new(new Uri(uri, UriKind.Absolute));
+
         private async Task ShowSelectedBookDetailsAsync()
         {
             if (_booksCatalogGrid.SelectedItem is not BookData book)
@@ -1192,9 +1601,9 @@ namespace PCDSLibrary.Desktop.Views
             }
 
             _bookDetailsPanel.Visibility = Visibility.Visible;
-            _bookCoverImage.Source = null;
-            _bookCoverImage.Visibility = Visibility.Collapsed;
-            _bookCoverStatus.Text = string.IsNullOrWhiteSpace(book.CoverImage) ? "No cover photo available." : "Loading cover photo...";
+            _bookCoverImage.Source = LoadPackImage("pack://application:,,,/Assets/pcds-seal.png");
+            _bookCoverImage.Visibility = Visibility.Visible;
+            _bookCoverStatus.Text = string.IsNullOrWhiteSpace(book.CoverImage) ? "Default PCDS Library cover" : "Loading cover photo...";
             _bookCoverStatus.Visibility = Visibility.Visible;
             _bookDetailsContent.Text = $"{book.Title}\nAuthor: {book.Author}\nCategory: {book.Category ?? "Not specified"}\nCall number: {book.CallNumber ?? "Not specified"}\nAccession number: {book.AccessionNumber}\nISBN: {book.Isbn ?? "Not specified"}\nPublication year: {book.PublicationYear?.ToString() ?? "Not specified"}\nCopies: {book.AvailableCopies} available of {book.TotalCopies}\n\n{book.Description ?? "No description available."}";
 
@@ -1206,7 +1615,7 @@ namespace PCDSLibrary.Desktop.Views
                 return;
             if (imageBytes == null)
             {
-                _bookCoverStatus.Text = "Cover photo is unavailable.";
+                _bookCoverStatus.Text = "Cover unavailable; showing the default PCDS Library cover.";
                 return;
             }
 
@@ -1228,6 +1637,19 @@ namespace PCDSLibrary.Desktop.Views
         {
             _booksCatalogStatus.Text = "Loading book catalog...";
             var result = await _apiService.GetBooksAsync();
+            if (result.Success)
+            {
+                var thumbnailTasks = result.Books.Select(async book =>
+                {
+                    book.CoverThumbnail = LoadPackImage("pack://application:,,,/Assets/pcds-seal.png");
+                    if (string.IsNullOrWhiteSpace(book.CoverImage))
+                        return;
+                    var bytes = await _apiService.GetBookCoverImageAsync(book.BookId);
+                    if (bytes != null)
+                        book.CoverThumbnail = LoadImage(bytes);
+                });
+                await Task.WhenAll(thumbnailTasks);
+            }
             _booksCatalogGrid.ItemsSource = result.Success ? result.Books : null;
             _booksCatalogStatus.Text = result.Success ? $"Book catalog • {result.Books.Count} title(s)" : result.Message;
         }
@@ -1346,7 +1768,7 @@ namespace PCDSLibrary.Desktop.Views
             RoutedEventArgs e)
         {
             ShowModuleContent(
-                "Active Loans",
+                "Borrowed Books",
                 "View borrowed books and their due dates.",
                 "📖",
                 ActiveLoansButton

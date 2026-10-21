@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Windows.Media;
 
 namespace PCDSLibrary.Desktop.Models
 {
@@ -81,5 +82,8 @@ namespace PCDSLibrary.Desktop.Models
 
         [JsonPropertyName("available_copies")]
         public int AvailableCopies { get; set; }
+
+        [JsonIgnore]
+        public ImageSource? CoverThumbnail { get; set; }
     }
 }
