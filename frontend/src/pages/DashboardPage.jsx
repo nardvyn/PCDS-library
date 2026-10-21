@@ -556,7 +556,7 @@ function ProfileSection({ user, summary, borrowingPeriod, onProfileUpdated }) {
   </>
 }
 
-function SummaryCard({ icon, label, value, color, onClick }) { return <button className="summary-card" onClick={onClick}><div className={`summary-icon ${color}`}>{icon}</div><div><span>{label}</span><strong>{value}</strong></div><ChevronRight size={18} className="summary-arrow" /></button> }
+function SummaryCard({ icon, label, value, color, onClick }) { return <button type="button" className="summary-card" onClick={onClick} aria-label={`${label}: ${value}. View details`}><div className={`summary-icon ${color}`} aria-hidden="true">{icon}</div><div><span>{label}</span><strong>{value}</strong></div><ChevronRight size={18} className="summary-arrow" aria-hidden="true" /></button> }
 function AccountRow({ label, value, valueClass = '' }) { return <div className="account-row"><span>{label}</span><strong className={valueClass}>{value}</strong></div> }
 function getLoanTiming(loan) {
   const dueDate = new Date(loan.due_date)
