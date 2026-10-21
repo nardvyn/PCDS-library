@@ -1,5 +1,7 @@
+import click
 from flask import Flask
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from config import Config
 from app.extensions import cors, db, jwt, migrate
@@ -42,6 +44,23 @@ def create_app():
 	app.register_blueprint(audit_bp)
 	app.register_blueprint(library_bp)
 	app.register_blueprint(borrower_bp)
+
+	@app.cli.command("send-daily-emails")
+	def send_daily_emails():
+		from app.services.email_jobs import run_daily_email_notifications
+		try:
+			result = run_daily_email_notifications()
+		except OperationalError as error:
+			database_url = app.config.get("SQLALCHEMY_DATABASE_URI", "") or ""
+			if "railway.internal" in database_url:
+				raise click.ClickException(
+					"The configured database uses Railway's private hostname, which is only "
+					"reachable inside Railway. Run this job from a Railway scheduled service, "
+					"or set LOCAL_DATABASE_URL (local MySQL) or DATABASE_PUBLIC_URL (Railway "
+					"public TCP proxy) in backend/.env."
+				) from error
+			raise click.ClickException(f"Could not connect to the database: {error.orig}") from error
+		print(f"Daily email job complete: {result}")
 
 	@app.get("/")
 	def index():

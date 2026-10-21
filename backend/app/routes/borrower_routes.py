@@ -8,6 +8,7 @@ from app.extensions import db
 from app.models.borrow_request import BorrowRequest
 from app.models.loan import Loan
 from app.models.notification import Notification
+from app.models.penalty import Penalty
 from app.models.library_setting import LibrarySetting
 from app.models.user import User
 from app.models.library_setting import LibrarySetting
@@ -40,6 +41,17 @@ def borrower_dashboard():
     default_loan_days = 14 if user.role == "TEACHER" else 7
     borrowing_period = int(settings.get("teacher_loan_days" if user.role == "TEACHER" else "student_loan_days", default_loan_days))
     daily_penalty = float(settings.get("daily_penalty", "10.00"))
+    borrowing_limit = int(settings.get("teacher_max_books" if user.role == "TEACHER" else "student_max_books", "3"))
+    borrowing_used = len(active_loans) + pending_requests
+
+    recent_returns = []
+    for loan in returned_loans[:5]:
+        data = loan.to_dict()
+        penalty = Penalty.query.filter_by(loan_id=loan.loan_id).first()
+        data["penalty_amount"] = float(penalty.amount) if penalty else 0
+        data["penalty_status"] = penalty.status if penalty else "NONE"
+        data["late_days"] = penalty.late_days if penalty else 0
+        recent_returns.append(data)
 
     return jsonify({
         "success": True,
@@ -52,7 +64,10 @@ def borrower_dashboard():
         "school_id_image_available": school_id_image_available,
         "borrowing_period": borrowing_period,
         "daily_penalty": daily_penalty,
+        "borrowing_limit": borrowing_limit,
+        "borrowing_used": borrowing_used,
+        "borrowing_remaining": max(borrowing_limit - borrowing_used, 0),
         "active_loans": [loan.to_dict() for loan in active_loans],
-        "recent_returns": [loan.to_dict() for loan in returned_loans[:5]],
+        "recent_returns": recent_returns,
         "recent_requests": [item.to_dict() for item in requests],
     }), 200

@@ -86,8 +86,8 @@
                                 </Border>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="ActiveLoansButton" Style="{StaticResource SidebarButtonStyle}" Click="ActiveLoansButton_Click" AutomationProperties.Name="Active loans">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Active loans" VerticalAlignment="Center"/></StackPanel>
+                        <Button x:Name="ActiveLoansButton" Style="{StaticResource SidebarButtonStyle}" Click="ActiveLoansButton_Click" AutomationProperties.Name="Borrowed books">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Borrowed books" VerticalAlignment="Center"/></StackPanel>
                         </Button>
                         <Button x:Name="BookReturnsButton" Style="{StaticResource SidebarButtonStyle}" Click="BookReturnsButton_Click" AutomationProperties.Name="Book returns">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Book returns" VerticalAlignment="Center"/></StackPanel>

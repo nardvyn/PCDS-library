@@ -75,6 +75,16 @@ py run.py
 
 The API runs with Flask's development server. For deployment, use a production WSGI server and configure the environment and database for your hosting platform.
 
+Run the email notification job once per day from your deployment scheduler to send due-date reminders, overdue notices, and the library requests/penalties summary:
+
+```powershell
+python -m flask --app run send-daily-emails
+```
+
+The job is idempotent per day: already-sent reminders and summaries are recorded in the audit log and are not sent again that day.
+
+Railway's `mysql.railway.internal` hostname is private and cannot be reached from a local PC. For a local run, set `LOCAL_DATABASE_URL` to a local MySQL database, or copy Railway's public TCP proxy URL into `MYSQL_PUBLIC_URL` (or `DATABASE_PUBLIC_URL`). When the command runs inside Railway, it continues to use `DATABASE_URL` and the private network automatically.
+
 ### 2. Run the web frontend
 
 In a second terminal:

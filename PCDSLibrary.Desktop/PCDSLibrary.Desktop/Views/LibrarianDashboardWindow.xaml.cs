@@ -29,6 +29,8 @@ namespace PCDSLibrary.Desktop.Views
         private TextBlock _bookDetailsContent = null!;
         private TextBox _studentLoanDaysInput = null!;
         private TextBox _teacherLoanDaysInput = null!;
+        private TextBox _studentMaxBooksInput = null!;
+        private TextBox _teacherMaxBooksInput = null!;
         private TextBox _dailyPenaltyInput = null!;
         private TextBox _newBookTitleInput = null!;
         private TextBox _newBookAuthorInput = null!;
@@ -441,22 +443,42 @@ namespace PCDSLibrary.Desktop.Views
         {
             var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
+            var totals = new TextBlock
+            {
+                Text = "Total assessed: PHP 0.00   •   Unpaid: PHP 0.00   •   Paid: PHP 0.00",
+                Margin = new Thickness(0, 0, 0, 14),
+                FontSize = 16,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D"))
+            };
+            var totalsCard = new Border
+            {
+                Padding = new Thickness(18),
+                Margin = new Thickness(0, 0, 0, 16),
+                CornerRadius = new CornerRadius(10),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F0FAF8")),
+                Child = totals
+            };
             var list = new StackPanel();
             var refresh = CreateRequestButton("Refresh", "#00899A");
-            refresh.Click += async (_, _) => await LoadPenaltiesAsync(list, status);
+            refresh.Click += async (_, _) => await LoadPenaltiesAsync(list, status, totals);
+            panel.Children.Add(totalsCard);
             panel.Children.Add(refresh);
             panel.Children.Add(status);
             panel.Children.Add(new ScrollViewer { Content = list, MaxHeight = 560, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
-            _ = LoadPenaltiesAsync(list, status);
+            _ = LoadPenaltiesAsync(list, status, totals);
             return panel;
         }
 
-        private async Task LoadPenaltiesAsync(StackPanel list, TextBlock status)
+        private async Task LoadPenaltiesAsync(StackPanel list, TextBlock status, TextBlock totals)
         {
             list.Children.Clear();
             status.Text = "Loading penalties...";
             var result = await _apiService.GetPenaltiesAsync();
             if (!result.Success) { status.Text = result.Message; return; }
+            totals.Text = $"Total assessed: PHP {result.TotalPenalties:N2}   •   Unpaid: PHP {result.UnpaidPenalties:N2}   •   Paid: PHP {result.PaidPenalties:N2}";
             status.Text = $"{result.Penalties.Count} penalty record(s)";
             if (result.Penalties.Count == 0) { list.Children.Add(CreateRequestMessage("No penalties recorded.", "#547177")); return; }
             foreach (var penalty in result.Penalties)
@@ -465,7 +487,7 @@ namespace PCDSLibrary.Desktop.Views
                 {
                     var response = await _apiService.MarkPenaltyPaidAsync(penalty.PenaltyId);
                     MessageBox.Show(response.Message, "Penalty payment", MessageBoxButton.OK, response.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
-                    if (response.Success) await LoadPenaltiesAsync(list, status);
+                    if (response.Success) await LoadPenaltiesAsync(list, status, totals);
                 });
                 list.Children.Add(row);
             }
@@ -741,6 +763,13 @@ namespace PCDSLibrary.Desktop.Views
                     AddVerificationAction(actions, "Verify", "VERIFIED", "#18724A", profile, list);
                 if (profile.VerificationStatus == "PENDING_VERIFICATION")
                     AddVerificationAction(actions, "Reject", "REJECTED", "#A6533D", profile, list);
+                if (profile.VerificationStatus == "VERIFIED")
+                {
+                    var resendEmailButton = CreateRequestButton("Resend approval email", "#00899A");
+                    resendEmailButton.Tag = profile.ProfileId.Value;
+                    resendEmailButton.Click += ResendApprovalEmailButton_Click;
+                    actions.Children.Add(resendEmailButton);
+                }
                 if (profile.VerificationStatus != "SUSPENDED")
                     AddVerificationAction(actions, "Suspend", "SUSPENDED", "#A11D1D", profile, list);
             }
@@ -777,6 +806,16 @@ namespace PCDSLibrary.Desktop.Views
                 MessageBox.Show(result.Message, "Profile Verification", MessageBoxButton.OK, MessageBoxImage.Error);
             else
                 await LoadVerificationProfilesAsync(action.List);
+        }
+
+        private async void ResendApprovalEmailButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button || button.Tag is not int profileId)
+                return;
+            button.IsEnabled = false;
+            var result = await _apiService.ResendApprovalEmailAsync(profileId);
+            button.IsEnabled = true;
+            MessageBox.Show(result.Message, "Approval Email", MessageBoxButton.OK, result.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
         }
 
         private async void ViewSchoolIdButton_Click(object sender, RoutedEventArgs e)
@@ -1044,6 +1083,10 @@ namespace PCDSLibrary.Desktop.Views
             _studentLoanDaysInput.Text = settings.StudentLoanDays.ToString();
             _teacherLoanDaysInput = AddBookField(form, "Teacher loan period (days)");
             _teacherLoanDaysInput.Text = settings.TeacherLoanDays.ToString();
+            _studentMaxBooksInput = AddBookField(form, "Maximum books per student");
+            _studentMaxBooksInput.Text = settings.StudentMaxBooks.ToString();
+            _teacherMaxBooksInput = AddBookField(form, "Maximum books per teacher");
+            _teacherMaxBooksInput.Text = settings.TeacherMaxBooks.ToString();
 
             form.Children.Add(CreateSettingsSection(
                 "Fines and notifications",
@@ -1084,6 +1127,8 @@ namespace PCDSLibrary.Desktop.Views
             }
             _studentLoanDaysInput.Text = response.Settings.StudentLoanDays.ToString();
             _teacherLoanDaysInput.Text = response.Settings.TeacherLoanDays.ToString();
+            _studentMaxBooksInput.Text = response.Settings.StudentMaxBooks.ToString();
+            _teacherMaxBooksInput.Text = response.Settings.TeacherMaxBooks.ToString();
             _dailyPenaltyInput.Text = response.Settings.DailyPenalty.ToString("0.00");
             _notificationsInput.IsChecked = response.Settings.NotificationsEnabled;
         }
@@ -1120,9 +1165,11 @@ namespace PCDSLibrary.Desktop.Views
         {
             if (!int.TryParse(_studentLoanDaysInput.Text, out var studentDays) || studentDays < 1 || studentDays > 365 ||
                 !int.TryParse(_teacherLoanDaysInput.Text, out var teacherDays) || teacherDays < 1 || teacherDays > 365 ||
+                !int.TryParse(_studentMaxBooksInput.Text, out var studentMaxBooks) || studentMaxBooks < 1 || studentMaxBooks > 50 ||
+                !int.TryParse(_teacherMaxBooksInput.Text, out var teacherMaxBooks) || teacherMaxBooks < 1 || teacherMaxBooks > 50 ||
                 !decimal.TryParse(_dailyPenaltyInput.Text, out var dailyPenalty) || dailyPenalty < 0 || dailyPenalty > 100000)
             {
-                MessageBox.Show("Enter valid policy values. Loan periods must be 1-365 days and penalty cannot be negative.", "Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Enter valid policy values. Loan periods must be 1-365 days, book limits must be 1-50, and penalty cannot be negative.", "Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1130,6 +1177,8 @@ namespace PCDSLibrary.Desktop.Views
             {
                 StudentLoanDays = studentDays,
                 TeacherLoanDays = teacherDays,
+                StudentMaxBooks = studentMaxBooks,
+                TeacherMaxBooks = teacherMaxBooks,
                 DailyPenalty = dailyPenalty,
                 NotificationsEnabled = _notificationsInput.IsChecked == true
             });
@@ -1141,6 +1190,8 @@ namespace PCDSLibrary.Desktop.Views
             var defaults = new LibrarySettingsData();
             _studentLoanDaysInput.Text = defaults.StudentLoanDays.ToString();
             _teacherLoanDaysInput.Text = defaults.TeacherLoanDays.ToString();
+            _studentMaxBooksInput.Text = defaults.StudentMaxBooks.ToString();
+            _teacherMaxBooksInput.Text = defaults.TeacherMaxBooks.ToString();
             _dailyPenaltyInput.Text = defaults.DailyPenalty.ToString("0.00");
             _notificationsInput.IsChecked = defaults.NotificationsEnabled;
             SaveSettingsButton_Click(sender, e);

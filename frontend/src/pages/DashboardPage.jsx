@@ -7,7 +7,7 @@ import api from '../services/api'
 import pcdsSeal from '../assets/pcds-seal.png'
 import './DashboardPage.css'
 
-const initialSummary = { borrowed_books: 0, pending_requests: 0, overdue_books: 0, returned_books: 0, unread_notifications: 0, active_loans: [], recent_requests: [] }
+const initialSummary = { borrowed_books: 0, pending_requests: 0, overdue_books: 0, returned_books: 0, unread_notifications: 0, borrowing_limit: 3, borrowing_used: 0, borrowing_remaining: 3, active_loans: [], recent_requests: [] }
 const sectionPaths = {
   dashboard: '/dashboard', books: '/books', loans: '/my-loans', dueSoon: '/my-loans', overdue: '/my-loans', requests: '/my-requests',
   history: '/history', notifications: '/notifications', profile: '/profile',
@@ -91,8 +91,8 @@ function DashboardPage() {
       <main className="dashboard-main">
         {activeSection !== 'dashboard' && <button className="mobile-menu-button section-menu-button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation menu"><Menu size={23} /></button>}
         {activeSection === 'dashboard' && <DashboardOverview user={user} firstName={firstName} summary={summary} loading={loading} error={dashboardError} onRetry={loadDashboard} borrowingPeriod={borrowingPeriod} isTeacher={isTeacher} onNavigate={navigateTo} setSidebarOpen={setSidebarOpen} />}
-        {activeSection === 'books' && <BrowseBooks user={user} profileVerified={summary.verification_status === 'VERIFIED'} onRequestSubmitted={loadDashboard} />}
-        {activeSection === 'loans' && <LoansSection key={location.state?.loanFilter || 'all'} summary={summary} loading={loading} onNavigate={navigateTo} initialFilter={location.state?.loanFilter || 'all'} />}
+        {activeSection === 'books' && <BrowseBooks user={user} summary={summary} profileVerified={summary.verification_status === 'VERIFIED'} onRequestSubmitted={loadDashboard} />}
+        {activeSection === 'loans' && <LoansSection key={location.state?.loanFilter || 'all'} summary={summary} loading={loading} error={dashboardError} onRetry={loadDashboard} onNavigate={navigateTo} initialFilter={location.state?.loanFilter || 'all'} />}
         {activeSection === 'requests' && <RequestsSection summary={summary} onNavigate={navigateTo} />}
         {activeSection === 'history' && <HistorySection summary={summary} />}
         {activeSection === 'notifications' && <NotificationsSection onUnreadCountChange={updateUnreadNotifications} />}
@@ -157,7 +157,7 @@ function DashboardOverview({ user, firstName, summary, loading, error, onRetry, 
 }
 
 function SectionHeader({ title, description, icon }) { return <div className="section-page-heading"><div className="section-page-icon">{icon}</div><div><p className="header-label">LIBRARY MEMBER</p><h2>{title}</h2><p className="header-description">{description}</p></div></div> }
-function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
+function BrowseBooks({ user, summary, profileVerified, onRequestSubmitted }) {
   const [books, setBooks] = useState([])
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search.trim().toLocaleLowerCase())
@@ -173,6 +173,11 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
   const [message, setMessage] = useState(null)
   const [selectedBook, setSelectedBook] = useState(null)
   const detailsDialogRef = useRef(null)
+  const borrowingLimit = Number(summary.borrowing_limit ?? 3)
+  const borrowingUsed = Number(summary.borrowing_used ?? ((summary.active_loans?.length || 0) + (summary.pending_requests || 0)))
+  const remainingAfterCart = Math.max(borrowingLimit - borrowingUsed - cartBooks.length, 0)
+  const cartLimitReached = borrowingUsed + cartBooks.length >= borrowingLimit
+  const borrowingUsagePercent = Math.min(100, ((borrowingUsed + cartBooks.length) / Math.max(borrowingLimit, 1)) * 100)
 
   useEffect(() => {
     let cancelled = false
@@ -235,9 +240,14 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
 
   function toggleCartBook(book) {
     setMessage(null)
-    setCartBooks((current) => current.some((item) => item.book_id === book.book_id)
-      ? current.filter((item) => item.book_id !== book.book_id)
-      : [...current, book])
+    setCartBooks((current) => {
+      if (current.some((item) => item.book_id === book.book_id)) return current.filter((item) => item.book_id !== book.book_id)
+      if (borrowingUsed + current.length >= borrowingLimit) {
+        setMessage({ type: 'error', text: `You have reached your ${borrowingLimit}-book borrowing limit. Pending requests and currently borrowed books count toward this limit.` })
+        return current
+      }
+      return [...current, book]
+    })
   }
 
   function removeCartBook(bookId) {
@@ -322,21 +332,28 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
         </select>
       </label>
     </div>
-    <section className="borrow-cart" aria-label="Borrow request cart">
+    <section className={`borrow-cart ${cartBooks.length ? 'has-items' : ''}`} aria-labelledby="borrow-cart-title">
       <div className="borrow-cart-heading">
         <div className="borrow-cart-icon"><ShoppingCart size={20} aria-hidden="true" /></div>
         <div className="borrow-cart-summary">
-          <h3>Your request cart <span>{cartBooks.length}</span></h3>
-          <p>{cartBooks.length ? 'Review your picks before sending your requests.' : 'Add available books here before submitting your borrow requests.'}</p>
+          <span className="borrow-cart-eyebrow">BORROW REQUEST</span>
+          <h3 id="borrow-cart-title">Your request cart <span>{cartBooks.length}</span></h3>
+          <p>{cartBooks.length ? 'Review your selected books before submitting.' : 'Select available books from the catalog below.'}</p>
         </div>
         <button className="submit-cart-button" type="button" onClick={submitCart} disabled={!canRequest || !profileVerified || cartSubmitting || cartBooks.length === 0}>
-          {cartSubmitting ? 'Submitting...' : cartBooks.length ? `Submit ${cartBooks.length} ${cartBooks.length === 1 ? 'request' : 'requests'}` : 'Cart is empty'}
+          {cartSubmitting ? 'Submitting...' : cartBooks.length ? <><Check size={17} aria-hidden="true" /> Submit {cartBooks.length} {cartBooks.length === 1 ? 'request' : 'requests'}</> : 'Cart is empty'}
         </button>
       </div>
+      <div className="borrow-limit" aria-label={`${borrowingUsed + cartBooks.length} of ${borrowingLimit} borrowing slots used`}>
+        <div className="borrow-limit-label"><span>Borrowing capacity</span><strong>{borrowingUsed + cartBooks.length} / {borrowingLimit} used · {remainingAfterCart} remaining</strong></div>
+        <div className="borrow-limit-track" role="progressbar" aria-valuemin="0" aria-valuemax={borrowingLimit} aria-valuenow={borrowingUsed + cartBooks.length}><span style={{ width: `${borrowingUsagePercent}%` }} /></div>
+        <small>Pending requests and currently borrowed books are included in your limit.</small>
+      </div>
       {cartBooks.length > 0 && <ul className="borrow-cart-items">
-        {cartBooks.map((book) => <li key={book.book_id}>
-          <div><strong>{book.title}</strong><span>Accession No. {book.accession_number}</span></div>
-          <button type="button" onClick={() => removeCartBook(book.book_id)} disabled={cartSubmitting} aria-label={`Remove ${book.title} from cart`}><X size={18} aria-hidden="true" /></button>
+        {cartBooks.map((book, index) => <li key={book.book_id}>
+          <div className="borrow-cart-item-icon" aria-hidden="true"><BookOpen size={18} /></div>
+          <div className="borrow-cart-item-details"><span>Selection {index + 1}</span><strong>{book.title}</strong><small>{book.author || 'Unknown author'} · Accession No. {book.accession_number}</small></div>
+          <button type="button" onClick={() => removeCartBook(book.book_id)} disabled={cartSubmitting} aria-label={`Remove ${book.title} from cart`} title="Remove from cart"><X size={17} aria-hidden="true" /></button>
         </li>)}
       </ul>}
     </section>
@@ -346,6 +363,7 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
         const unavailable = book.available_copies < 1
         const alreadyRequested = requestedBookIds.includes(book.book_id)
         const inCart = cartBooks.some((item) => item.book_id === book.book_id)
+        const limitBlocksAddition = cartLimitReached && !inCart
         return <article className="book-card" key={book.book_id}>
           <BookCover book={book} />
           <div className="book-card-details">
@@ -358,8 +376,8 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
           </div>
           <div className="book-card-actions">
             <button className="book-details-button" type="button" onClick={() => setSelectedBook(book)}><Eye size={16} aria-hidden="true" /> View details</button>
-            <button className={`request-book-button add-to-cart-button ${inCart ? 'in-cart' : ''}`} type="button" onClick={() => toggleCartBook(book)} disabled={!canRequest || !profileVerified || unavailable || alreadyRequested || cartSubmitting}>
-              {alreadyRequested ? <><Check size={16} aria-hidden="true" /> Requested</> : inCart ? <><Check size={16} aria-hidden="true" /> In cart</> : <><ShoppingCart size={16} aria-hidden="true" /> Add to cart</>}
+            <button className={`request-book-button add-to-cart-button ${inCart ? 'in-cart' : ''}`} type="button" onClick={() => toggleCartBook(book)} disabled={!canRequest || !profileVerified || unavailable || alreadyRequested || cartSubmitting || limitBlocksAddition} title={limitBlocksAddition ? `Borrowing limit reached (${borrowingLimit})` : undefined}>
+              {alreadyRequested ? <><Check size={16} aria-hidden="true" /> Requested</> : inCart ? <><Check size={16} aria-hidden="true" /> In cart</> : limitBlocksAddition ? <>Limit reached</> : <><ShoppingCart size={16} aria-hidden="true" /> Add to cart</>}
             </button>
           </div>
         </article>
@@ -421,39 +439,38 @@ function BookCover({ book }) {
     <img src="/pcds-library-icon.png" alt={`Default PCDS Library cover for ${book.title}`} loading="lazy" />
   </div>
 }
-function LoansSection({ summary, loading, onNavigate, initialFilter }) {
-  const loans = summary.active_loans.filter((loan) => {
+function LoansSection({ summary, loading, error, onRetry, onNavigate, initialFilter }) {
+  const allLoans = summary.active_loans || []
+  const dueSoonCount = allLoans.filter((loan) => {
+    const timing = getLoanTiming(loan)
+    return timing && !timing.isOverdue && timing.daysRemaining <= 3
+  }).length
+  const overdueCount = allLoans.filter((loan) => getLoanTiming(loan)?.isOverdue).length
+  const loans = allLoans.filter((loan) => {
     const timing = getLoanTiming(loan)
     if (initialFilter === 'overdue') return timing?.isOverdue
     if (initialFilter === 'dueSoon') return timing && !timing.isOverdue && timing.daysRemaining <= 3
     return true
   })
-  const filterLabels = { all: 'all active loans', dueSoon: 'books due within 3 days', overdue: 'overdue books' }
+  const filters = [['all', 'All', allLoans.length], ['dueSoon', 'Due Soon', dueSoonCount], ['overdue', 'Overdue', overdueCount]]
   return <>
-    <SectionHeader title="My Borrowed Books" description="Track active loans and due dates from your account." icon={<BookOpenCheck size={24} />} />
-    <div className="loan-filter-toolbar">
-      <label htmlFor="loan-list-filter">Show</label>
-      <select id="loan-list-filter" value={initialFilter} onChange={(event) => onNavigate(event.target.value === 'all' ? 'loans' : event.target.value)}>
-        <option value="all">All active loans</option>
-        <option value="dueSoon">Due within 3 days</option>
-        <option value="overdue">Overdue</option>
-      </select>
+    <SectionHeader title="My Borrowed Books" description="Track active loans, due dates, and return status from your account." icon={<BookOpenCheck size={24} />} />
+    <div className="loan-summary-grid" aria-label="Borrowed books summary">
+      <div className="loan-summary-card"><BookOpenCheck size={22} aria-hidden="true" /><span>Active Loans</span><strong>{allLoans.length}</strong></div>
+      <div className="loan-summary-card due-soon"><Clock3 size={22} aria-hidden="true" /><span>Due Soon</span><strong>{dueSoonCount}</strong></div>
+      <div className="loan-summary-card overdue"><CalendarDays size={22} aria-hidden="true" /><span>Overdue</span><strong>{overdueCount}</strong></div>
     </div>
-    <div className="dashboard-panel section-list-panel">
-      {loading ? <DashboardLoading /> : loans.length
-        ? <>{initialFilter !== 'all' && <p className="loan-filter-result">{loans.length} {filterLabels[initialFilter]}.</p>}{loans.map((loan) => <LoanItem key={loan.loan_id} loan={loan} />)}</>
-        : <EmptyState
-          icon={<Library size={30} />}
-          title={initialFilter === 'overdue' ? 'No overdue books' : initialFilter === 'dueSoon' ? 'Nothing due soon' : 'No borrowed books'}
-          description={initialFilter === 'all' ? 'You do not have any active loans.' : 'There are no books in this category right now.'}
-          buttonText={initialFilter === 'all' ? 'Browse books' : 'View all loans'}
-          onClick={() => initialFilter === 'all' ? onNavigate('books') : onNavigate('loans')}
-        />}
+    <div className="loan-filter-tabs" role="tablist" aria-label="Filter borrowed books">
+      {filters.map(([key, label, count]) => <button key={key} type="button" role="tab" aria-selected={initialFilter === key} className={initialFilter === key ? 'active' : ''} onClick={() => onNavigate(key === 'all' ? 'loans' : key)}>{label}<span>{count}</span></button>)}
     </div>
+    {loading ? <div className="dashboard-panel loan-state-panel"><DashboardLoading /></div>
+      : error ? <div className="dashboard-panel loan-state-panel"><div className="section-placeholder"><Library size={34} /><h3>Unable to load borrowed books</h3><p>{error}</p><button className="request-book-button" type="button" onClick={onRetry}>Try again</button></div></div>
+        : loans.length ? <div className="loan-card-grid">{loans.map((loan) => <BorrowedBookCard key={loan.loan_id} loan={loan} />)}</div>
+          : <div className="dashboard-panel loan-state-panel"><EmptyState icon={<Library size={30} />} title={initialFilter === 'overdue' ? 'No overdue books' : initialFilter === 'dueSoon' ? 'Nothing due soon' : "You haven't borrowed any books yet"} description={initialFilter === 'all' ? 'Browse the library collection and request your first book.' : 'There are no books in this category right now.'} buttonText={initialFilter === 'all' ? 'Browse Books' : 'View All Loans'} onClick={() => initialFilter === 'all' ? onNavigate('books') : onNavigate('loans')} /></div>}
   </>
 }
 function RequestsSection({ summary, onNavigate }) { return <><SectionHeader title="My Requests" description="Review the status of your borrowing requests." icon={<Clock3 size={24} />} /><div className="dashboard-panel section-list-panel">{summary.recent_requests?.length ? summary.recent_requests.map((request) => <RequestItem key={request.request_id} request={request} />) : <EmptyState icon={<Clock3 size={30} />} title="No borrow requests yet" description="Browse the catalog to request an available book." buttonText="Browse books" onClick={() => onNavigate('books')} />}</div></> }
-function HistorySection({ summary }) { return <><SectionHeader title="Borrowing History" description="See the books you have previously returned." icon={<History size={24} />} /><div className="dashboard-panel section-list-panel">{summary.recent_returns?.length ? summary.recent_returns.map((loan) => <LoanItem key={loan.loan_id} loan={{ ...loan, due_date: loan.returned_at }} />) : <div className="section-placeholder"><History size={34} /><h3>No returned books yet</h3><p>Returned books will appear in your history.</p></div>}</div></> }
+function HistorySection({ summary }) { return <><SectionHeader title="Borrowing History" description="See the books you have previously returned." icon={<History size={24} />} />{summary.recent_returns?.length ? <div className="book-catalog history-card-list">{summary.recent_returns.map((loan) => <ReturnedLoanItem key={loan.loan_id} loan={loan} />)}</div> : <div className="dashboard-panel section-placeholder"><History size={34} /><h3>No returned books yet</h3><p>Returned books will appear in your history.</p></div>}</> }
 function NotificationsSection({ onUnreadCountChange }) {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
@@ -553,6 +570,35 @@ function getLoanTiming(loan) {
   }
 }
 
+function BorrowedBookCard({ loan }) {
+  const timing = getLoanTiming(loan)
+  const formatDate = (value) => {
+    const date = value ? new Date(value) : null
+    return date && !Number.isNaN(date.getTime())
+      ? date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+      : 'Unavailable'
+  }
+  const status = timing?.isOverdue ? 'Overdue' : timing?.daysRemaining === 0 ? 'Due today' : timing?.daysRemaining <= 3 ? 'Due soon' : 'Active'
+  const remainingLabel = timing?.isOverdue
+    ? `${timing.daysOverdue} ${timing.daysOverdue === 1 ? 'day' : 'days'} overdue`
+    : timing?.daysRemaining === 0
+      ? 'Return today'
+      : `${timing?.daysRemaining ?? 0} ${timing?.daysRemaining === 1 ? 'day' : 'days'} remaining`
+  const book = { book_id: loan.book_id, title: loan.book_title, author: loan.book_author || 'Unknown author', cover_image: loan.cover_image }
+
+  return <article className={`borrowed-book-card ${timing?.isOverdue ? 'is-overdue' : timing?.daysRemaining <= 3 ? 'is-due-soon' : ''}`}>
+    <BookCover book={book} />
+    <div className="borrowed-book-content">
+      <div className="borrowed-book-heading"><div><h3>{loan.book_title}</h3><p>{loan.book_author || 'Unknown author'}</p></div><span className={`loan-status-badge ${timing?.isOverdue ? 'overdue' : timing?.daysRemaining <= 3 ? 'due-soon' : 'active'}`}>{status}</span></div>
+      <dl className="borrowed-book-dates">
+        <div><dt>Date borrowed</dt><dd>{formatDate(loan.borrowed_at)}</dd></div>
+        <div><dt>Due date</dt><dd>{formatDate(loan.due_date)}</dd></div>
+      </dl>
+      <div className="borrowed-book-footer"><span>Accession No. {loan.accession_number}</span><strong>{remainingLabel}</strong></div>
+    </div>
+  </article>
+}
+
 function LoanItem({ loan }) {
   const timing = getLoanTiming(loan)
   const dueDateLabel = timing
@@ -573,6 +619,37 @@ function LoanItem({ loan }) {
       {timingLabel && <span className="loan-timing-label" role="status">{timingLabel}</span>}
     </div>
   </div>
+}
+function ReturnedLoanItem({ loan }) {
+  const returnedAt = loan.returned_at ? new Date(loan.returned_at) : null
+  const dueDate = loan.due_date ? new Date(loan.due_date) : null
+  const hasReturnedDate = returnedAt && !Number.isNaN(returnedAt.getTime())
+  const hasDueDate = dueDate && !Number.isNaN(dueDate.getTime())
+  const returnedDay = String(loan.returned_at || '').slice(0, 10)
+  const dueDay = String(loan.due_date || '').slice(0, 10)
+  const lateDays = hasReturnedDate && hasDueDate
+    ? Math.max(0, Math.round((Date.parse(`${returnedDay}T00:00:00Z`) - Date.parse(`${dueDay}T00:00:00Z`)) / 86_400_000))
+    : 0
+  const returnedDateLabel = hasReturnedDate
+    ? returnedAt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'Date unavailable'
+  const timingLabel = lateDays > 0
+    ? `Returned ${lateDays} ${lateDays === 1 ? 'day' : 'days'} late`
+    : 'Returned on time'
+
+  return <article className={`book-card returned-book-card ${lateDays > 0 ? 'returned-book-card-late' : ''}`}>
+    <div className="book-card-cover returned-book-cover" aria-hidden="true">
+      <BookOpen size={48} />
+      <span>RETURNED</span>
+    </div>
+    <div className="book-card-details">
+      <h3>{loan.book_title}</h3>
+      <p>Returned {returnedDateLabel}</p>
+      <span className="book-identifiers">Accession No. {loan.accession_number}</span>
+      <strong className={`returned-book-status ${lateDays > 0 ? 'is-late' : 'is-on-time'}`} role="status">{timingLabel}</strong>
+      <span className={`returned-book-penalty ${Number(loan.penalty_amount || 0) > 0 ? 'has-penalty' : ''}`}>Penalty: {Number(loan.penalty_amount || 0).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })}{loan.penalty_status && loan.penalty_status !== 'NONE' ? ` · ${loan.penalty_status}` : ''}</span>
+    </div>
+  </article>
 }
 function RequestItem({ request }) { const requestedAt = new Date(request.requested_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }); return <div className="loan-item"><div className="loan-book-icon"><Clock3 size={21} /></div><div className="loan-information"><strong>{request.book_title}</strong><span>Requested {requestedAt}</span></div><div className={`request-status ${request.status.toLowerCase()}`}>{request.status}</div></div> }
 function EmptyState({ icon, title, description, buttonText, onClick }) { return <div className="dashboard-empty-state"><div className="empty-state-icon">{icon}</div><h4>{title}</h4><p>{description}</p><button onClick={onClick}>{buttonText}</button></div> }

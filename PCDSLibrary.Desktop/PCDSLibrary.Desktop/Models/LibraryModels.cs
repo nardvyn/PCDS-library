@@ -13,6 +13,8 @@ namespace PCDSLibrary.Desktop.Models
     {
         [JsonPropertyName("student_loan_days")] public int StudentLoanDays { get; set; } = 7;
         [JsonPropertyName("teacher_loan_days")] public int TeacherLoanDays { get; set; } = 14;
+        [JsonPropertyName("student_max_books")] public int StudentMaxBooks { get; set; } = 3;
+        [JsonPropertyName("teacher_max_books")] public int TeacherMaxBooks { get; set; } = 3;
         [JsonPropertyName("daily_penalty")] public decimal DailyPenalty { get; set; } = 10;
         [JsonPropertyName("notifications_enabled")] public bool NotificationsEnabled { get; set; } = true;
     }
@@ -30,6 +32,10 @@ namespace PCDSLibrary.Desktop.Models
 
         [JsonPropertyName("penalties")]
         public List<PenaltyData> Penalties { get; set; } = new();
+
+        [JsonPropertyName("total_penalties")] public decimal TotalPenalties { get; set; }
+        [JsonPropertyName("unpaid_penalties")] public decimal UnpaidPenalties { get; set; }
+        [JsonPropertyName("paid_penalties")] public decimal PaidPenalties { get; set; }
 
         [JsonPropertyName("borrowers")]
         public List<BorrowerData> Borrowers { get; set; } = new();

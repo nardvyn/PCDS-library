@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from sqlalchemy import func
 
@@ -15,6 +15,7 @@ from app.models.penalty import Penalty
 from app.models.library_setting import LibrarySetting
 from app.models.user import User
 from app.services.audit_service import record_audit
+from app.services.email_service import send_penalty_emails, send_return_email
 
 library_bp = Blueprint("library_operations", __name__, url_prefix="/api/library")
 
@@ -30,6 +31,8 @@ def denied_response():
 DEFAULT_SETTINGS = {
     "student_loan_days": "7",
     "teacher_loan_days": "14",
+    "student_max_books": "3",
+    "teacher_max_books": "3",
     "daily_penalty": "10.00",
     "notifications_enabled": "true",
 }
@@ -51,6 +54,8 @@ def read_library_settings():
         "settings": {
             "student_loan_days": int(settings["student_loan_days"]),
             "teacher_loan_days": int(settings["teacher_loan_days"]),
+            "student_max_books": int(settings["student_max_books"]),
+            "teacher_max_books": int(settings["teacher_max_books"]),
             "daily_penalty": float(settings["daily_penalty"]),
             "notifications_enabled": settings["notifications_enabled"].lower() == "true",
         },
@@ -66,15 +71,19 @@ def save_library_settings():
     try:
         student_days = int(data.get("student_loan_days", 7))
         teacher_days = int(data.get("teacher_loan_days", 14))
+        student_max_books = int(data.get("student_max_books", 3))
+        teacher_max_books = int(data.get("teacher_max_books", 3))
         daily_penalty = Decimal(str(data.get("daily_penalty", 10)))
     except (TypeError, ValueError):
         return jsonify({"success": False, "message": "Loan periods and penalty must be valid numbers."}), 400
-    if not 1 <= student_days <= 365 or not 1 <= teacher_days <= 365 or not Decimal("0") <= daily_penalty <= Decimal("100000"):
-        return jsonify({"success": False, "message": "Loan periods must be 1-365 days and penalty must be between 0 and 100000."}), 400
+    if not 1 <= student_days <= 365 or not 1 <= teacher_days <= 365 or not 1 <= student_max_books <= 50 or not 1 <= teacher_max_books <= 50 or not Decimal("0") <= daily_penalty <= Decimal("100000"):
+        return jsonify({"success": False, "message": "Loan periods must be 1-365 days, book limits must be 1-50, and penalty must be between 0 and 100000."}), 400
 
     values = {
         "student_loan_days": str(student_days),
         "teacher_loan_days": str(teacher_days),
+        "student_max_books": str(student_max_books),
+        "teacher_max_books": str(teacher_max_books),
         "daily_penalty": f"{daily_penalty:.2f}",
         "notifications_enabled": "true" if data.get("notifications_enabled", True) else "false",
     }
@@ -105,7 +114,7 @@ def save_library_settings():
         else:
             setting.setting_value = value
             setting.updated_by = actor_id
-    record_audit(actor_id, "LIBRARY_SETTINGS_UPDATED", "SETTINGS", None, f"Student loan {student_days} days; teacher loan {teacher_days} days; daily penalty PHP {daily_penalty:.2f}; active loan due dates adjusted: {adjusted_loan_count}.")
+    record_audit(actor_id, "LIBRARY_SETTINGS_UPDATED", "SETTINGS", None, f"Student loan {student_days} days, max {student_max_books} books; teacher loan {teacher_days} days, max {teacher_max_books} books; daily penalty PHP {daily_penalty:.2f}; active loan due dates adjusted: {adjusted_loan_count}.")
     db.session.commit()
     return jsonify({"success": True, "message": "Library settings saved."}), 200
 
@@ -169,6 +178,19 @@ def return_loan(loan_id):
     db.session.add(Notification(user_id=loan.user_id, title="Book return processed", message=f"Your return of '{loan.book.title}' was processed.{condition_message}{penalty_message}", category="loan"))
     record_audit(get_jwt_identity(), "BOOK_RETURNED", "LOAN", loan.loan_id, f"Returned '{loan.book.title}' ({condition}); late days: {late_days}; penalty: PHP {Decimal(late_days) * daily_penalty:.2f}.")
     db.session.commit()
+    try:
+        delivered = send_return_email(loan, late_days, Decimal(late_days) * daily_penalty)
+        record_audit(None, "EMAIL_RETURN_CONFIRMATION_SENT" if delivered else "EMAIL_DELIVERY_FAILED", "LOAN", loan.loan_id, f"Return email {'sent to' if delivered else 'not delivered to'} {loan.user.email or 'missing email'}.")
+        db.session.commit()
+    except Exception as error:
+        current_app.logger.exception("Unable to deliver return confirmation for loan %s.", loan.loan_id)
+        record_audit(None, "EMAIL_DELIVERY_FAILED", "LOAN", loan.loan_id, str(error))
+        db.session.commit()
+    if penalty:
+        try:
+            send_penalty_emails(penalty, "created")
+        except Exception:
+            current_app.logger.exception("Unable to deliver penalty-created email notifications for penalty %s.", penalty.penalty_id)
     return jsonify({"success": True, "message": "Return processed.", "loan": loan.to_dict(), "late_days": late_days, "penalty_amount": float(penalty.amount) if penalty else 0}), 200
 
 
@@ -181,7 +203,17 @@ def list_penalties():
     query = Penalty.query.order_by(Penalty.created_at.desc())
     if status in {"UNPAID", "PAID"}:
         query = query.filter_by(status=status)
-    return jsonify({"success": True, "penalties": [item.to_dict() for item in query.all()]}), 200
+    penalties = query.all()
+    total_assessed = sum((item.amount for item in penalties), Decimal("0"))
+    total_unpaid = sum((item.amount for item in penalties if item.status == "UNPAID"), Decimal("0"))
+    total_paid = sum((item.amount for item in penalties if item.status == "PAID"), Decimal("0"))
+    return jsonify({
+        "success": True,
+        "penalties": [item.to_dict() for item in penalties],
+        "total_penalties": float(total_assessed),
+        "unpaid_penalties": float(total_unpaid),
+        "paid_penalties": float(total_paid),
+    }), 200
 
 
 @library_bp.patch("/penalties/<int:penalty_id>/pay")
@@ -196,8 +228,13 @@ def mark_penalty_paid(penalty_id):
         return jsonify({"success": False, "message": "Penalty is already marked paid."}), 409
     penalty.status = "PAID"
     penalty.paid_at = datetime.now(timezone.utc)
+    db.session.add(Notification(user_id=penalty.user_id, title="Penalty payment recorded", message=f"Your PHP {float(penalty.amount):.2f} penalty for '{penalty.loan.book.title}' has been marked paid.", category="penalty"))
     record_audit(get_jwt_identity(), "PENALTY_PAID", "PENALTY", penalty.penalty_id, f"Collected PHP {float(penalty.amount):.2f} from {penalty.user.full_name}.")
     db.session.commit()
+    try:
+        send_penalty_emails(penalty, "updated")
+    except Exception:
+        current_app.logger.exception("Unable to deliver penalty-updated email notifications for penalty %s.", penalty.penalty_id)
     return jsonify({"success": True, "message": "Penalty marked paid.", "penalty": penalty.to_dict()}), 200
 
 

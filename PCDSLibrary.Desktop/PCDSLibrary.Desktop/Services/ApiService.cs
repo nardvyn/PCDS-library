@@ -390,6 +390,19 @@ namespace PCDSLibrary.Desktop.Services
             }
         }
 
+        public async Task<VerificationResponse> ResendApprovalEmailAsync(int profileId)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync($"verification/profiles/{profileId}/approval-email", new { });
+                return await response.Content.ReadFromJsonAsync<VerificationResponse>() ?? new VerificationResponse { Success = false, Message = "Invalid response from the server." };
+            }
+            catch (Exception error)
+            {
+                return new VerificationResponse { Success = false, Message = error.Message };
+            }
+        }
+
         public async Task<(byte[]? Image, string Error)> GetSchoolIdImageAsync(int profileId)
         {
             try

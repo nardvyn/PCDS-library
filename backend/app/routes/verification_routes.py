@@ -10,6 +10,7 @@ from app.models.borrower_profile import BorrowerProfile
 from app.models.notification import Notification
 from app.models.user import User
 from app.services.audit_service import record_audit
+from app.services.email_service import send_account_approval_email, send_account_status_email
 
 verification_bp = Blueprint("verification", __name__, url_prefix="/api/verification")
 
@@ -29,6 +30,21 @@ def borrower_profile_is_complete(profile, role):
         return False
     image_path = Path(current_app.config["UPLOAD_FOLDER"]) / profile.school_id_image
     return image_path.is_file()
+
+
+def deliver_approval_email(profile, actor_id):
+    try:
+        delivered = send_account_approval_email(profile.user)
+        action = "ACCOUNT_APPROVAL_EMAIL_SENT" if delivered else "ACCOUNT_APPROVAL_EMAIL_FAILED"
+        details = f"Approval email {'sent to' if delivered else 'could not be sent to'} {profile.user.email or 'missing email address'}."
+        record_audit(actor_id, action, "USER", profile.user_id, details)
+        db.session.commit()
+        return delivered
+    except Exception as error:
+        current_app.logger.exception("Unable to deliver account approval email for user %s.", profile.user_id)
+        record_audit(actor_id, "ACCOUNT_APPROVAL_EMAIL_FAILED", "USER", profile.user_id, f"Approval email to {profile.user.email or 'missing email address'} failed: {str(error)[:300]}")
+        db.session.commit()
+        return False
 
 
 @verification_bp.get("/profiles")
@@ -89,8 +105,10 @@ def update_profile_status(profile_id):
             "success": False,
             "message": "The borrower profile is incomplete or its School ID image is unavailable. Ask the borrower to resubmit the profile before verifying.",
         }), 409
+    previous_status = profile.verification_status
+    actor_id = int(get_jwt_identity())
     profile.verification_status = status
-    profile.verified_by = int(get_jwt_identity())
+    profile.verified_by = actor_id
     profile.verified_at = datetime.now(timezone.utc)
     profile.user.account_status = "SUSPENDED" if status == "SUSPENDED" else "ACTIVE"
     notification_details = {
@@ -100,9 +118,40 @@ def update_profile_status(profile_id):
     }
     title, message = notification_details[status]
     db.session.add(Notification(user_id=profile.user_id, title=title, message=message, category="account"))
-    record_audit(get_jwt_identity(), f"BORROWER_{status}", "USER", profile.user_id, f"{profile.user.full_name} ({profile.school_id_number or 'no school ID'}).")
+    record_audit(actor_id, f"BORROWER_{status}", "USER", profile.user_id, f"{profile.user.full_name} ({profile.school_id_number or 'no school ID'}).")
     db.session.commit()
-    return jsonify({"success": True, "message": f"Profile {status.lower()}.", "profile": profile.to_dict()}), 200
+    email_sent = deliver_approval_email(profile, actor_id) if status == "VERIFIED" and previous_status != "VERIFIED" else None
+    if status == "REJECTED" and previous_status != "REJECTED":
+        try:
+            email_sent = send_account_status_email(profile.user, status)
+            record_audit(actor_id, "ACCOUNT_REJECTION_EMAIL_SENT" if email_sent else "ACCOUNT_REJECTION_EMAIL_FAILED", "USER", profile.user_id, f"Rejection email {'sent to' if email_sent else 'could not be sent to'} {profile.user.email or 'missing email'}.")
+            db.session.commit()
+        except Exception as error:
+            current_app.logger.exception("Unable to deliver rejection email for user %s.", profile.user_id)
+            record_audit(actor_id, "ACCOUNT_REJECTION_EMAIL_FAILED", "USER", profile.user_id, str(error))
+            db.session.commit()
+    response_message = f"Profile {status.lower()}."
+    if email_sent is False:
+        response_message += " The approval email could not be delivered; the failure was logged and can be retried."
+    return jsonify({"success": True, "message": response_message, "profile": profile.to_dict(), "approval_email_sent": email_sent}), 200
+
+
+@verification_bp.post("/profiles/<int:profile_id>/approval-email")
+@jwt_required()
+def resend_approval_email(profile_id):
+    if not is_admin():
+        return jsonify({"success": False, "message": "Administrator access is required."}), 403
+    profile = db.session.get(BorrowerProfile, profile_id)
+    if not profile:
+        return jsonify({"success": False, "message": "Profile was not found."}), 404
+    if profile.verification_status != "VERIFIED":
+        return jsonify({"success": False, "message": "Only verified accounts can receive an approval email."}), 409
+    if not profile.user.email:
+        return jsonify({"success": False, "message": "This user does not have a registered email address."}), 409
+    delivered = deliver_approval_email(profile, int(get_jwt_identity()))
+    if not delivered:
+        return jsonify({"success": False, "message": "The approval email could not be delivered. The error was recorded in the audit log."}), 502
+    return jsonify({"success": True, "message": f"Approval email sent to {profile.user.email}."}), 200
 
 
 @verification_bp.get("/profiles/<int:profile_id>/school-id")

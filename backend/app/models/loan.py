@@ -31,6 +31,8 @@ class Loan(db.Model):
             "role": self.user.role if self.user else "",
             "book_id": self.book_id,
             "book_title": self.book.title if self.book else "Unknown book",
+            "book_author": self.book.author if self.book else "Unknown author",
+            "cover_image": self.book.cover_image if self.book else None,
             "accession_number": self.book.accession_number if self.book else "",
             "borrowed_at": self.borrowed_at.isoformat() if self.borrowed_at else None,
             "due_date": self.due_date.isoformat() if self.due_date else None,

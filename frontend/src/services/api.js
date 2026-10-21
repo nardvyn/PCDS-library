@@ -1,9 +1,10 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.DEV
-    ? 'http://127.0.0.1:5000/api'
-    : (import.meta.env.VITE_API_URL || 'https://pcds-library-production.up.railway.app/api'),
+  baseURL: import.meta.env.VITE_API_URL
+    || (import.meta.env.DEV
+      ? 'http://127.0.0.1:5000/api'
+      : 'https://pcds-library-production.up.railway.app/api'),
   headers: {
     'Content-Type': 'application/json',
   },

@@ -16,12 +16,35 @@ from app.models.loan import Loan
 from app.models.library_setting import LibrarySetting
 from app.models.user import User
 from app.services.audit_service import record_audit
+from app.services.email_service import send_borrow_request_email
 
 borrow_requests_bp = Blueprint("borrow_requests", __name__, url_prefix="/api/borrow-requests")
 
 
 def has_staff_access():
     return get_jwt().get("role") in {"ADMIN", "LIBRARIAN"}
+
+
+def get_borrow_limit(user):
+    setting_key = "teacher_max_books" if user.role == "TEACHER" else "student_max_books"
+    setting = db.session.get(LibrarySetting, setting_key)
+    return int(setting.setting_value) if setting else 3
+
+
+def get_borrow_usage(user_id):
+    active_loans = Loan.query.filter_by(user_id=user_id, status="ACTIVE").count()
+    pending_requests = BorrowRequest.query.filter_by(user_id=user_id, status="PENDING").count()
+    return active_loans + pending_requests
+
+
+def deliver_request_email(item, event):
+    try:
+        delivered = send_borrow_request_email(item, event)
+        record_audit(None, "EMAIL_BORROW_REQUEST_SENT" if delivered else "EMAIL_DELIVERY_FAILED", "BORROW_REQUEST", item.request_id, f"{event.title()} email {'sent to' if delivered else 'not delivered to'} {item.user.email or 'missing email' }.")
+    except Exception as error:
+        current_app.logger.exception("Borrow request email failed for request %s.", item.request_id)
+        record_audit(None, "EMAIL_DELIVERY_FAILED", "BORROW_REQUEST", item.request_id, str(error))
+    db.session.commit()
 
 
 @borrow_requests_bp.get("")
@@ -52,6 +75,16 @@ def create_borrow_request():
     if not profile or profile.verification_status != "VERIFIED":
         return jsonify({"success": False, "message": "Your school profile must be verified before borrowing books."}), 403
 
+    borrow_limit = get_borrow_limit(user)
+    borrow_usage = get_borrow_usage(user_id)
+    if borrow_usage >= borrow_limit:
+        return jsonify({
+            "success": False,
+            "message": f"You have reached your {borrow_limit}-book borrowing limit. Return a book or wait for a pending request to be processed.",
+            "borrowing_limit": borrow_limit,
+            "borrowing_used": borrow_usage,
+        }), 409
+
     book_id = str(data.get("book_id", "")).strip()
     if book_id:
         book = db.session.get(Book, int(book_id))
@@ -63,6 +96,7 @@ def create_borrow_request():
         item = BorrowRequest(user_id=user_id, book_id=book.book_id)
         db.session.add(item)
         db.session.commit()
+        deliver_request_email(item, "submitted")
         return jsonify({"success": True, "message": "Borrow request submitted.", "request": item.to_dict()}), 201
 
     requested_title = str(data.get("title", "")).strip()
@@ -100,6 +134,7 @@ def create_borrow_request():
     db.session.add(item)
     try:
         db.session.commit()
+        deliver_request_email(item, "submitted")
     except Exception:
         db.session.rollback()
         image_path.unlink(missing_ok=True)
@@ -152,8 +187,15 @@ def update_borrow_request(request_id):
             db.session.add(book)
             db.session.flush()
         item.book = book
+    if status == "APPROVED" and not book.is_active:
+        return jsonify({"success": False, "message": "This book has been removed from the active catalog and cannot be approved."}), 409
     if status == "APPROVED" and book.available_copies < 1:
         return jsonify({"success": False, "message": "The book no longer has available copies."}), 409
+    if status == "APPROVED":
+        active_loan_count = Loan.query.filter_by(user_id=item.user_id, status="ACTIVE").count()
+        borrow_limit = get_borrow_limit(item.user)
+        if active_loan_count >= borrow_limit:
+            return jsonify({"success": False, "message": f"This borrower already has the maximum of {borrow_limit} active books."}), 409
 
     item.status = status
     item.processed_at = datetime.now(timezone.utc)
@@ -174,4 +216,5 @@ def update_borrow_request(request_id):
     db.session.add(Notification(user_id=item.user_id, title=title, message=message, category="borrow_request"))
     record_audit(get_jwt_identity(), f"BORROW_REQUEST_{status}", "BORROW_REQUEST", item.request_id, f"{item.book.title if item.book else item.requested_title} requested by {item.user.full_name}.")
     db.session.commit()
+    deliver_request_email(item, status.lower())
     return jsonify({"success": True, "message": f"Request {status.lower()}.", "request": item.to_dict()}), 200

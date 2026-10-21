@@ -20,6 +20,7 @@ from app.extensions import db
 from app.models.user import User
 from app.models.borrower_profile import BorrowerProfile
 from app.services.audit_service import record_audit
+from app.services.email_service import send_library_account_alert
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 PASSWORD_RESET_MAX_AGE = 30 * 60
@@ -135,6 +136,14 @@ def google_login():
         db.session.flush()
         db.session.add(BorrowerProfile(user_id=user.user_id))
         db.session.commit()
+        try:
+            delivered = send_library_account_alert(user)
+            record_audit(None, "EMAIL_PENDING_ACCOUNT_ALERT_SENT" if delivered else "EMAIL_DELIVERY_FAILED", "USER", user.user_id, f"New Google account alert {'sent to the library' if delivered else 'was not delivered'} for {user.email}.")
+            db.session.commit()
+        except Exception as error:
+            current_app.logger.exception("Unable to deliver pending-account alert for Google user %s.", user.user_id)
+            record_audit(None, "EMAIL_DELIVERY_FAILED", "USER", user.user_id, str(error))
+            db.session.commit()
         profile_required = True
     else:
         user.google_id = google_id
@@ -304,6 +313,14 @@ def register():
         db.session.flush()
         db.session.add(BorrowerProfile(user_id=user.user_id))
         db.session.commit()
+        try:
+            delivered = send_library_account_alert(user)
+            record_audit(None, "EMAIL_PENDING_ACCOUNT_ALERT_SENT" if delivered else "EMAIL_DELIVERY_FAILED", "USER", user.user_id, f"New-account alert {'sent to the library' if delivered else 'was not delivered'} for {user.email}.")
+            db.session.commit()
+        except Exception as error:
+            current_app.logger.exception("Unable to deliver pending-account alert for user %s.", user.user_id)
+            record_audit(None, "EMAIL_DELIVERY_FAILED", "USER", user.user_id, str(error))
+            db.session.commit()
         return jsonify({
             "success": True,
             "message": "Account created successfully.",
