@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { googleLogout } from '@react-oauth/google'
 import { Bell, BookOpen, BookOpenCheck, CalendarDays, Check, ChevronRight, Clock3, Eye, History, LayoutDashboard, Library, LogOut, Menu, Search, ShoppingCart, UserRound, X } from 'lucide-react'
@@ -160,7 +160,7 @@ function SectionHeader({ title, description, icon }) { return <div className="se
 function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
   const [books, setBooks] = useState([])
   const [search, setSearch] = useState('')
-  const [searchTerm, setSearchTerm] = useState('')
+  const deferredSearch = useDeferredValue(search.trim().toLocaleLowerCase())
   const [categoryFilter, setCategoryFilter] = useState('')
   const [availableOnly, setAvailableOnly] = useState(false)
   const [sortOrder, setSortOrder] = useState('title-asc')
@@ -176,7 +176,7 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
 
   useEffect(() => {
     let cancelled = false
-    api.get('/books', { params: { search: searchTerm } })
+    api.get('/books')
       .then(({ data }) => {
         if (!cancelled) {
           setBooks(data.books || [])
@@ -190,7 +190,7 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
         if (!cancelled) setCatalogLoading(false)
       })
     return () => { cancelled = true }
-  }, [searchTerm, catalogReloadKey])
+  }, [catalogReloadKey])
 
   useEffect(() => {
     const dialog = detailsDialogRef.current
@@ -206,16 +206,32 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
     [books],
   )
   const filteredBooks = useMemo(() => {
+    const normalized = (value) => String(value || '').toLocaleLowerCase()
+    const searchRank = (book) => {
+      if (!deferredSearch) return 0
+      const title = normalized(book.title)
+      if (title.startsWith(deferredSearch)) return 0
+      if (title.split(/\s+/).some((word) => word.startsWith(deferredSearch))) return 1
+      if (title.includes(deferredSearch)) return 2
+      if (normalized(book.author).includes(deferredSearch)) return 3
+      if (normalized(book.category).includes(deferredSearch)) return 4
+      if (normalized(book.isbn).includes(deferredSearch)) return 5
+      if (normalized(book.accession_number).includes(deferredSearch)) return 6
+      return Number.POSITIVE_INFINITY
+    }
     const result = books
+      .map((book) => ({ ...book, searchRank: searchRank(book) }))
+      .filter((book) => Number.isFinite(book.searchRank))
       .filter((book) => !categoryFilter || book.category === categoryFilter)
       .filter((book) => !availableOnly || book.available_copies > 0)
     result.sort((left, right) => {
+      if (deferredSearch && left.searchRank !== right.searchRank) return left.searchRank - right.searchRank
       if (sortOrder === 'title-desc') return right.title.localeCompare(left.title)
       if (sortOrder === 'newest') return (right.publication_year || 0) - (left.publication_year || 0) || left.title.localeCompare(right.title)
       return left.title.localeCompare(right.title)
     })
     return result
-  }, [availableOnly, books, categoryFilter, sortOrder])
+  }, [availableOnly, books, categoryFilter, deferredSearch, sortOrder])
 
   function toggleCartBook(book) {
     setMessage(null)
@@ -279,10 +295,11 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
     {!profileVerified && <div className="catalog-message" role="status">Your school profile must be verified before you can submit a borrow request.</div>}
     {!canRequest && <div className="catalog-message" role="status">Only student and teacher accounts can request books.</div>}
     {message && <div className={`catalog-message ${message.type}`} role="status">{message.text}</div>}
-    <form className="catalog-search" onSubmit={(event) => { event.preventDefault(); setCatalogLoading(true); setSearchTerm(search.trim()); setCatalogReloadKey((current) => current + 1) }}>
+    <form className="catalog-search" role="search" onSubmit={(event) => { event.preventDefault(); setSearch(search.trim()) }}>
       <Search size={19} aria-hidden="true" />
-      <input aria-label="Search books" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by title, author, ISBN, accession number, or subject" />
-      <button type="submit">Search</button>
+      <input aria-label="Search books" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by title, author, ISBN, accession number, or category" />
+      {search && <button className="catalog-search-clear" type="button" onClick={() => setSearch('')} aria-label="Clear book search"><X size={18} aria-hidden="true" /></button>}
+      <button className="catalog-search-submit" type="submit">Search</button>
     </form>
     <div className="catalog-toolbar" aria-label="Catalog filters and sorting">
       <label className="catalog-filter-field">
@@ -347,7 +364,7 @@ function BrowseBooks({ user, profileVerified, onRequestSubmitted }) {
           </div>
         </article>
       })}</div>
-      : <div className="dashboard-panel section-placeholder"><Library size={34} /><h3>No books found</h3><p>Try another search, choose a different category, or turn off “Available only”.</p></div>}
+      : <div className="dashboard-panel section-placeholder"><Library size={34} /><h3>No books found</h3><p>{deferredSearch ? `No books match “${search.trim()}”. Clear the search or try another keyword.` : 'Choose a different category or turn off “Available only”.'}</p></div>}
     <dialog className="book-details-dialog" ref={detailsDialogRef} aria-labelledby="book-details-title" onClose={() => setSelectedBook(null)} onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close() }}>
       {selectedBook && <>
         <div className="book-details-dialog-header">
