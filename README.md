@@ -85,6 +85,10 @@ The job is idempotent per day: already-sent reminders and summaries are recorded
 
 Railway's `mysql.railway.internal` hostname is private and cannot be reached from a local PC. For a local run, set `LOCAL_DATABASE_URL` to a local MySQL database, or copy Railway's public TCP proxy URL into `MYSQL_PUBLIC_URL` (or `DATABASE_PUBLIC_URL`). When the command runs inside Railway, it continues to use `DATABASE_URL` and the private network automatically.
 
+### Persistent uploaded images on Railway
+
+Book covers must live on a Railway Volume so they survive deployments and restarts. Attach one Volume to the backend service and use `/data` as its mount path. Railway supplies `RAILWAY_VOLUME_MOUNT_PATH` automatically; the backend then stores book covers below `/data/uploads/book_covers` without requiring an additional variable.
+
 ### 2. Run the web frontend
 
 In a second terminal:

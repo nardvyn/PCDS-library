@@ -24,9 +24,11 @@ def can_manage_books():
 def cover_image_path(filename):
     if not filename or Path(filename).name != filename:
         return None
-    uploads_root = Path(current_app.config["UPLOAD_FOLDER"]).parent
-    for folder in ("book_covers", "borrow_request_books"):
-        candidate = uploads_root / folder / filename
+    for folder in (
+        Path(current_app.config["BOOK_COVER_FOLDER"]),
+        Path(current_app.config["UPLOAD_FOLDER"]).parent / "borrow_request_books",
+    ):
+        candidate = folder / filename
         if candidate.is_file():
             return candidate
     return None
@@ -87,7 +89,7 @@ def upload_book_cover_image(book_id):
         return jsonify({"success": False, "message": "The cover image must be no larger than 5 MB."}), 413
 
     filename = secure_filename(f"book-{book_id}-{uuid4().hex}{extension}")
-    image_folder = Path(current_app.config["UPLOAD_FOLDER"]).parent / "book_covers"
+    image_folder = Path(current_app.config["BOOK_COVER_FOLDER"])
     image_folder.mkdir(parents=True, exist_ok=True)
     image_path = image_folder / filename
     previous_image = book.cover_image
