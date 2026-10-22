@@ -763,13 +763,6 @@ namespace PCDSLibrary.Desktop.Views
                     AddVerificationAction(actions, "Verify", "VERIFIED", "#18724A", profile, list);
                 if (profile.VerificationStatus == "PENDING_VERIFICATION")
                     AddVerificationAction(actions, "Reject", "REJECTED", "#A6533D", profile, list);
-                if (profile.VerificationStatus == "VERIFIED")
-                {
-                    var resendEmailButton = CreateRequestButton("Resend approval email", "#00899A");
-                    resendEmailButton.Tag = profile.ProfileId.Value;
-                    resendEmailButton.Click += ResendApprovalEmailButton_Click;
-                    actions.Children.Add(resendEmailButton);
-                }
                 if (profile.VerificationStatus != "SUSPENDED")
                     AddVerificationAction(actions, "Suspend", "SUSPENDED", "#A11D1D", profile, list);
             }
@@ -806,16 +799,6 @@ namespace PCDSLibrary.Desktop.Views
                 MessageBox.Show(result.Message, "Profile Verification", MessageBoxButton.OK, MessageBoxImage.Error);
             else
                 await LoadVerificationProfilesAsync(action.List);
-        }
-
-        private async void ResendApprovalEmailButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button button || button.Tag is not int profileId)
-                return;
-            button.IsEnabled = false;
-            var result = await _apiService.ResendApprovalEmailAsync(profileId);
-            button.IsEnabled = true;
-            MessageBox.Show(result.Message, "Approval Email", MessageBoxButton.OK, result.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
         }
 
         private async void ViewSchoolIdButton_Click(object sender, RoutedEventArgs e)
