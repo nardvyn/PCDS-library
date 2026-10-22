@@ -97,7 +97,7 @@ class PenaltyFlowTest(unittest.TestCase):
         self.assertEqual(response.get_json()["penalty_amount"], 0)
         self.assertIsNone(Penalty.query.filter_by(loan_id=loan.loan_id).first())
 
-    def test_account_approval_sends_email_and_supports_retry(self):
+    def test_account_approval_sends_email_automatically(self):
         profile = BorrowerProfile(user_id=self.borrower.user_id, verification_status="PENDING_VERIFICATION")
         db.session.add(profile)
         db.session.commit()
@@ -109,16 +109,9 @@ class PenaltyFlowTest(unittest.TestCase):
             )
             self.assertEqual(approved.status_code, 200)
             self.assertTrue(approved.get_json()["approval_email_sent"])
+            self.assertIn("sent automatically", approved.get_json()["message"])
             send_email.assert_called_once()
             self.assertEqual(send_email.call_args.args[0].email, self.borrower.email)
-
-        with patch("app.routes.verification_routes.send_account_approval_email", return_value=True) as resend_email:
-            retried = self.client.post(
-                f"/api/verification/profiles/{profile.profile_id}/approval-email",
-                headers={"Authorization": f"Bearer {self.token}"},
-            )
-            self.assertEqual(retried.status_code, 200)
-            resend_email.assert_called_once()
 
 
 if __name__ == "__main__":

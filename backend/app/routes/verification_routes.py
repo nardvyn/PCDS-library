@@ -131,27 +131,11 @@ def update_profile_status(profile_id):
             record_audit(actor_id, "ACCOUNT_REJECTION_EMAIL_FAILED", "USER", profile.user_id, str(error))
             db.session.commit()
     response_message = f"Profile {status.lower()}."
-    if email_sent is False:
-        response_message += " The approval email could not be delivered; the failure was logged and can be retried."
+    if status == "VERIFIED" and email_sent is True:
+        response_message += f" Approval email sent automatically to {profile.user.email}."
+    elif status == "VERIFIED" and email_sent is False:
+        response_message += " The approval email could not be delivered; the failure was recorded in the audit log."
     return jsonify({"success": True, "message": response_message, "profile": profile.to_dict(), "approval_email_sent": email_sent}), 200
-
-
-@verification_bp.post("/profiles/<int:profile_id>/approval-email")
-@jwt_required()
-def resend_approval_email(profile_id):
-    if not is_admin():
-        return jsonify({"success": False, "message": "Administrator access is required."}), 403
-    profile = db.session.get(BorrowerProfile, profile_id)
-    if not profile:
-        return jsonify({"success": False, "message": "Profile was not found."}), 404
-    if profile.verification_status != "VERIFIED":
-        return jsonify({"success": False, "message": "Only verified accounts can receive an approval email."}), 409
-    if not profile.user.email:
-        return jsonify({"success": False, "message": "This user does not have a registered email address."}), 409
-    delivered = deliver_approval_email(profile, int(get_jwt_identity()))
-    if not delivered:
-        return jsonify({"success": False, "message": "The approval email could not be delivered. The error was recorded in the audit log."}), 502
-    return jsonify({"success": True, "message": f"Approval email sent to {profile.user.email}."}), 200
 
 
 @verification_bp.get("/profiles/<int:profile_id>/school-id")
