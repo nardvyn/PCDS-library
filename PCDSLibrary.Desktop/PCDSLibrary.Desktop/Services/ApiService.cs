@@ -279,6 +279,28 @@ namespace PCDSLibrary.Desktop.Services
                 });
                 form.Add(imageContent, "cover_image", Path.GetFileName(filePath));
                 using var response = await _httpClient.PostAsync($"books/{bookId}/cover-image", form);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound &&
+                    response.Content.Headers.ContentType?.MediaType != "application/json")
+                {
+                    return new BookResponse
+                    {
+                        Success = false,
+                        Message = "The connected library server does not support book cover uploads yet. Deploy the updated backend and try again."
+                    };
+                }
+
+                if (response.Content.Headers.ContentType?.MediaType != "application/json")
+                {
+                    return new BookResponse
+                    {
+                        Success = false,
+                        Message = response.IsSuccessStatusCode
+                            ? "The server uploaded the cover but returned an invalid response. Refresh the catalog to verify the image."
+                            : $"The library server could not upload the cover (HTTP {(int)response.StatusCode})."
+                    };
+                }
+
                 return await response.Content.ReadFromJsonAsync<BookResponse>() ?? new BookResponse
                 {
                     Success = false,
