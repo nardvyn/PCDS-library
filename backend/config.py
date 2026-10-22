@@ -6,6 +6,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def book_cover_folder():
+	"""Store book covers on an attached Railway volume when available."""
+	volume_mount = os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
+	if volume_mount:
+		return os.path.join(volume_mount, "uploads", "book_covers")
+
+	upload_folder = os.getenv(
+		"UPLOAD_FOLDER",
+		os.path.join(os.path.dirname(__file__), "app", "uploads", "school_ids"),
+	)
+	return os.path.join(os.path.dirname(upload_folder), "book_covers")
+
+
 def database_url():
 	"""Prefer a reachable database URL for the environment running the app."""
 	if os.getenv("RAILWAY_ENVIRONMENT"):
@@ -56,4 +69,5 @@ class Config:
 		"UPLOAD_FOLDER",
 		os.path.join(os.path.dirname(__file__), "app", "uploads", "school_ids"),
 	)
+	BOOK_COVER_FOLDER = book_cover_folder()
 	MAX_CONTENT_LENGTH = 5 * 1024 * 1024
