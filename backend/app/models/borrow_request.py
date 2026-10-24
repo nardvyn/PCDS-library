@@ -27,6 +27,7 @@ class BorrowRequest(db.Model):
             "user_id": self.user_id,
             "borrower_name": self.user.full_name if self.user else "Unknown borrower",
             "school_id": self.user.school_id if self.user else "",
+            "borrower_role": self.user.role if self.user else "",
             "book_id": self.book_id,
             "book_title": self.book.title if self.book else (self.requested_title or "Unknown book"),
             "author": (self.book.author if self.book else None) or (self.requested_author or ""),

@@ -34,6 +34,9 @@ namespace PCDSLibrary.Desktop.Models
         [JsonPropertyName("school_id")]
         public string SchoolId { get; set; } = "";
 
+        [JsonPropertyName("borrower_role")]
+        public string BorrowerRole { get; set; } = "";
+
         [JsonPropertyName("book_title")]
         public string BookTitle { get; set; } = "";
 

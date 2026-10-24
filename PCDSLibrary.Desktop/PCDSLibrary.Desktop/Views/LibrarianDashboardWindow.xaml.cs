@@ -993,7 +993,21 @@ namespace PCDSLibrary.Desktop.Views
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var details = new StackPanel();
             details.Children.Add(new TextBlock { Text = request.BookTitle, FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D")) });
-            details.Children.Add(new TextBlock { Text = $"Requested by {request.BorrowerName} ({request.SchoolId})", Margin = new Thickness(0, 5, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            details.Children.Add(new TextBlock
+            {
+                Text = $"Borrower: {request.BorrowerName}",
+                Margin = new Thickness(0, 7, 0, 0),
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#176487"))
+            });
+            details.Children.Add(new TextBlock
+            {
+                Text = $"School ID: {(string.IsNullOrWhiteSpace(request.SchoolId) ? "Not available" : request.SchoolId)}{(string.IsNullOrWhiteSpace(request.BorrowerRole) ? "" : $" • {request.BorrowerRole}")}",
+                Margin = new Thickness(0, 3, 0, 0),
+                FontSize = 12,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177"))
+            });
             details.Children.Add(new TextBlock { Text = $"Call number: {request.CallNumber} • Accession: {request.AccessionNumber}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             if (!string.IsNullOrWhiteSpace(request.Author))
                 details.Children.Add(new TextBlock { Text = $"Author: {request.Author}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
