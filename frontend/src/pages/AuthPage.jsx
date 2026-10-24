@@ -8,14 +8,11 @@ import pcdsSeal from '../assets/pcds-seal.png'
 import './AuthPage.css'
 
 const courseOptions = [
-  ['BSIT', 'Bachelor of Science in Information Technology (BSIT)'],
-  ['BSCRIM', 'Bachelor of Science in Criminology (BSCRIM)'],
-  ['BSBA', 'Bachelor of Science in Business Administration (BSBA)'],
-  ['BSHM', 'Bachelor of Science in Hospitality Management (BSHM)'],
-  ['BSTM', 'Bachelor of Science in Tourism Management (BSTM)'],
-  ['BEED', 'Bachelor of Elementary Education (BEED)'],
-  ['BSED', 'Bachelor of Secondary Education (BSED)'],
-  ['OTHER', 'Other / Not listed'],
+  ['Bachelor of Science in Information Technology', 'Bachelor of Science in Information Technology (BSIT)'],
+  ['Bachelor of Science in Criminology', 'Bachelor of Science in Criminology (BSCrim)'],
+  ['Bachelor of Science in Radiologic Technology', 'Bachelor of Science in Radiologic Technology (BSRT)'],
+  ['Bachelor of Science in Nursing', 'Bachelor of Science in Nursing (BSN)'],
+  ['Bachelor of Science in Hospitality Management', 'Bachelor of Science in Hospitality Management (BSHM)'],
 ]
 
 const yearLevelOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year']
@@ -39,7 +36,7 @@ function AuthPage() {
   const [loginData, setLoginData] = useState({ email: '', password: '' })
   const [forgotEmail, setForgotEmail] = useState('')
   const [resetData, setResetData] = useState({ password: '', confirmPassword: '' })
-  const [profileData, setProfileData] = useState({ user_type: 'STUDENT', school_id_number: '', course: '', course_other: '', year_level: '', section: '', section_other: '', department: '', contact_number: '', address: '', password: '' })
+  const [profileData, setProfileData] = useState({ user_type: 'STUDENT', school_id_number: '', course: '', year_level: '', section: '', section_other: '', department: '', contact_number: '', address: '', password: '' })
   const [schoolIdFile, setSchoolIdFile] = useState(null)
 
   function updateLogin(event) {
@@ -76,9 +73,8 @@ function AuthPage() {
     try {
       const formData = new FormData()
       Object.entries(profileData).forEach(([key, value]) => {
-        if (key === 'course_other' || key === 'section_other') return
-        if (key === 'course') formData.append(key, value === 'OTHER' ? profileData.course_other.trim() : value)
-        else if (key === 'section') formData.append(key, value === 'OTHER' ? profileData.section_other.trim() : value)
+        if (key === 'section_other') return
+        if (key === 'section') formData.append(key, value === 'OTHER' ? profileData.section_other.trim() : value)
         else formData.append(key, value)
       })
       if (schoolIdFile) formData.append('school_id', schoolIdFile)
@@ -226,7 +222,6 @@ function ProfileSetupForm({ profileData, updateProfile, handleSubmit, loading, o
     <div className="field"><label htmlFor="school-id-number">School ID / Employee ID</label><input id="school-id-number" name="school_id_number" value={profileData.school_id_number} onChange={updateProfile} required /></div>
     {profileData.user_type === 'STUDENT' ? <>
       <div className="field"><label htmlFor="course">Course</label><select id="course" name="course" value={profileData.course} onChange={updateProfile} required><option value="" disabled>Select your course</option>{courseOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
-      {profileData.course === 'OTHER' && <div className="field conditional-field"><label htmlFor="course-other">Course name</label><input id="course-other" name="course_other" value={profileData.course_other} onChange={updateProfile} placeholder="Enter your complete course name" required /></div>}
       <div className="field-grid">
         <div className="field"><label htmlFor="year-level">Year level</label><select id="year-level" name="year_level" value={profileData.year_level} onChange={updateProfile} required><option value="" disabled>Select year level</option>{yearLevelOptions.map((year) => <option key={year} value={year}>{year}</option>)}</select></div>
         <div className="field"><label htmlFor="section">Section</label><select id="section" name="section" value={profileData.section} onChange={updateProfile} required><option value="" disabled>Select section</option>{sectionOptions.map((section) => <option key={section} value={section}>{section === 'OTHER' ? 'Other / Not listed' : `Section ${section}`}</option>)}</select></div>
