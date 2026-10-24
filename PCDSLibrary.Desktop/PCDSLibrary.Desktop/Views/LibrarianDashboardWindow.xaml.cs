@@ -1008,6 +1008,15 @@ namespace PCDSLibrary.Desktop.Views
                 FontSize = 12,
                 Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177"))
             });
+            var academicDetails = string.Join(" • ", new[] { request.BorrowerCourse, request.BorrowerYearLevel, request.BorrowerSection }.Where(value => !string.IsNullOrWhiteSpace(value)));
+            if (!string.IsNullOrWhiteSpace(academicDetails))
+                details.Children.Add(new TextBlock { Text = $"Academic details: {academicDetails}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            if (!string.IsNullOrWhiteSpace(request.BorrowerDepartment))
+                details.Children.Add(new TextBlock { Text = $"Department: {request.BorrowerDepartment}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            details.Children.Add(new TextBlock { Text = $"Email: {(string.IsNullOrWhiteSpace(request.BorrowerEmail) ? "Not available" : request.BorrowerEmail)} • Contact: {(string.IsNullOrWhiteSpace(request.BorrowerContact) ? "Not available" : request.BorrowerContact)}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            if (!string.IsNullOrWhiteSpace(request.BorrowerAddress))
+                details.Children.Add(new TextBlock { Text = $"Address: {request.BorrowerAddress}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            details.Children.Add(new TextBlock { Text = $"Account: {request.BorrowerAccountStatus} • Verification: {request.BorrowerVerificationStatus}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#31565C")) });
             details.Children.Add(new TextBlock { Text = $"Call number: {request.CallNumber} • Accession: {request.AccessionNumber}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             if (!string.IsNullOrWhiteSpace(request.Author))
                 details.Children.Add(new TextBlock { Text = $"Author: {request.Author}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });

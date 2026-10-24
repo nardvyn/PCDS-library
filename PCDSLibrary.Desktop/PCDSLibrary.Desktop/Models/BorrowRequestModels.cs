@@ -37,6 +37,16 @@ namespace PCDSLibrary.Desktop.Models
         [JsonPropertyName("borrower_role")]
         public string BorrowerRole { get; set; } = "";
 
+        [JsonPropertyName("borrower_email")] public string BorrowerEmail { get; set; } = "";
+        [JsonPropertyName("borrower_contact")] public string BorrowerContact { get; set; } = "";
+        [JsonPropertyName("borrower_course")] public string BorrowerCourse { get; set; } = "";
+        [JsonPropertyName("borrower_year_level")] public string BorrowerYearLevel { get; set; } = "";
+        [JsonPropertyName("borrower_section")] public string BorrowerSection { get; set; } = "";
+        [JsonPropertyName("borrower_department")] public string BorrowerDepartment { get; set; } = "";
+        [JsonPropertyName("borrower_address")] public string BorrowerAddress { get; set; } = "";
+        [JsonPropertyName("borrower_account_status")] public string BorrowerAccountStatus { get; set; } = "";
+        [JsonPropertyName("borrower_verification_status")] public string BorrowerVerificationStatus { get; set; } = "";
+
         [JsonPropertyName("book_title")]
         public string BookTitle { get; set; } = "";
 

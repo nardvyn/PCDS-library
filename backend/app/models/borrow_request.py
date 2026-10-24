@@ -22,12 +22,22 @@ class BorrowRequest(db.Model):
     book = db.relationship("Book")
 
     def to_dict(self):
+        profile = self.user.borrower_profile if self.user else None
         return {
             "request_id": self.request_id,
             "user_id": self.user_id,
             "borrower_name": self.user.full_name if self.user else "Unknown borrower",
-            "school_id": self.user.school_id if self.user else "",
+            "school_id": ((profile.school_id_number if profile else None) or (self.user.school_id if self.user else "")),
             "borrower_role": self.user.role if self.user else "",
+            "borrower_email": self.user.email if self.user else "",
+            "borrower_contact": ((profile.contact_number if profile else None) or (self.user.contact_number if self.user else "")),
+            "borrower_course": ((profile.course if profile else None) or (self.user.course if self.user else "")),
+            "borrower_year_level": profile.year_level if profile else "",
+            "borrower_section": profile.section if profile else "",
+            "borrower_department": profile.department if profile else "",
+            "borrower_address": ((profile.address if profile else None) or (self.user.address if self.user else "")),
+            "borrower_account_status": self.user.account_status if self.user else "",
+            "borrower_verification_status": profile.verification_status if profile else "NO_PROFILE",
             "book_id": self.book_id,
             "book_title": self.book.title if self.book else (self.requested_title or "Unknown book"),
             "author": (self.book.author if self.book else None) or (self.requested_author or ""),
