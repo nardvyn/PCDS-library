@@ -7,6 +7,20 @@ import GoogleSignInButton from '../components/GoogleSignInButton'
 import pcdsSeal from '../assets/pcds-seal.png'
 import './AuthPage.css'
 
+const courseOptions = [
+  ['BSIT', 'Bachelor of Science in Information Technology (BSIT)'],
+  ['BSCRIM', 'Bachelor of Science in Criminology (BSCRIM)'],
+  ['BSBA', 'Bachelor of Science in Business Administration (BSBA)'],
+  ['BSHM', 'Bachelor of Science in Hospitality Management (BSHM)'],
+  ['BSTM', 'Bachelor of Science in Tourism Management (BSTM)'],
+  ['BEED', 'Bachelor of Elementary Education (BEED)'],
+  ['BSED', 'Bachelor of Secondary Education (BSED)'],
+  ['OTHER', 'Other / Not listed'],
+]
+
+const yearLevelOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year']
+const sectionOptions = ['A', 'B', 'C', 'D', 'E', 'F', 'OTHER']
+
 function AuthPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -25,7 +39,7 @@ function AuthPage() {
   const [loginData, setLoginData] = useState({ email: '', password: '' })
   const [forgotEmail, setForgotEmail] = useState('')
   const [resetData, setResetData] = useState({ password: '', confirmPassword: '' })
-  const [profileData, setProfileData] = useState({ user_type: 'STUDENT', school_id_number: '', course: '', year_level: '', section: '', department: '', contact_number: '', address: '', password: '' })
+  const [profileData, setProfileData] = useState({ user_type: 'STUDENT', school_id_number: '', course: '', course_other: '', year_level: '', section: '', section_other: '', department: '', contact_number: '', address: '', password: '' })
   const [schoolIdFile, setSchoolIdFile] = useState(null)
 
   function updateLogin(event) {
@@ -61,7 +75,12 @@ function AuthPage() {
     setMessage(null)
     try {
       const formData = new FormData()
-      Object.entries(profileData).forEach(([key, value]) => formData.append(key, value))
+      Object.entries(profileData).forEach(([key, value]) => {
+        if (key === 'course_other' || key === 'section_other') return
+        if (key === 'course') formData.append(key, value === 'OTHER' ? profileData.course_other.trim() : value)
+        else if (key === 'section') formData.append(key, value === 'OTHER' ? profileData.section_other.trim() : value)
+        else formData.append(key, value)
+      })
       if (schoolIdFile) formData.append('school_id', schoolIdFile)
       const { data } = await api.put('/auth/profile', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
       if (data.user) localStorage.setItem('user', JSON.stringify(data.user))
@@ -205,8 +224,15 @@ function ProfileSetupForm({ profileData, updateProfile, handleSubmit, loading, o
     <p className="form-description">Your profile will be reviewed before you can submit borrow requests.</p>
     <div className="field"><label htmlFor="user-type">Account type</label><select id="user-type" name="user_type" value={profileData.user_type} onChange={updateProfile}><option value="STUDENT">Student</option><option value="TEACHER">Teacher</option></select></div>
     <div className="field"><label htmlFor="school-id-number">School ID / Employee ID</label><input id="school-id-number" name="school_id_number" value={profileData.school_id_number} onChange={updateProfile} required /></div>
-    {profileData.user_type === 'STUDENT' ? <div className="field-grid"><div className="field"><label htmlFor="course">Course</label><input id="course" name="course" value={profileData.course} onChange={updateProfile} required /></div><div className="field"><label htmlFor="year-level">Year level</label><input id="year-level" name="year_level" value={profileData.year_level} onChange={updateProfile} required /></div></div> : <div className="field"><label htmlFor="department">Department</label><input id="department" name="department" value={profileData.department} onChange={updateProfile} required /></div>}
-    {profileData.user_type === 'STUDENT' && <div className="field"><label htmlFor="section">Section</label><input id="section" name="section" value={profileData.section} onChange={updateProfile} required /></div>}
+    {profileData.user_type === 'STUDENT' ? <>
+      <div className="field"><label htmlFor="course">Course</label><select id="course" name="course" value={profileData.course} onChange={updateProfile} required><option value="" disabled>Select your course</option>{courseOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+      {profileData.course === 'OTHER' && <div className="field conditional-field"><label htmlFor="course-other">Course name</label><input id="course-other" name="course_other" value={profileData.course_other} onChange={updateProfile} placeholder="Enter your complete course name" required /></div>}
+      <div className="field-grid">
+        <div className="field"><label htmlFor="year-level">Year level</label><select id="year-level" name="year_level" value={profileData.year_level} onChange={updateProfile} required><option value="" disabled>Select year level</option>{yearLevelOptions.map((year) => <option key={year} value={year}>{year}</option>)}</select></div>
+        <div className="field"><label htmlFor="section">Section</label><select id="section" name="section" value={profileData.section} onChange={updateProfile} required><option value="" disabled>Select section</option>{sectionOptions.map((section) => <option key={section} value={section}>{section === 'OTHER' ? 'Other / Not listed' : `Section ${section}`}</option>)}</select></div>
+      </div>
+      {profileData.section === 'OTHER' && <div className="field conditional-field"><label htmlFor="section-other">Section name</label><input id="section-other" name="section_other" value={profileData.section_other} onChange={updateProfile} placeholder="Enter your section" required /></div>}
+    </> : <div className="field"><label htmlFor="department">Department</label><input id="department" name="department" value={profileData.department} onChange={updateProfile} required /></div>}
     <div className="field"><label htmlFor="profile-contact">Phone number</label><input id="profile-contact" name="contact_number" type="tel" value={profileData.contact_number} onChange={updateProfile} placeholder="e.g. 09XX XXX XXXX" autoComplete="tel" required /></div>
     <div className="field"><label htmlFor="profile-password">Create password</label><div className="password-field"><input id="profile-password" name="password" type={showPassword ? 'text' : 'password'} value={profileData.password} onChange={updateProfile} placeholder="At least 8 characters" autoComplete="new-password" minLength="8" required /><button className="icon-button" type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={19} /> : <Eye size={19} />}</button></div><p className="password-hint">Use this password when signing in with your email.</p></div>
     <div className="field"><label htmlFor="profile-address">Address <span>Optional</span></label><input id="profile-address" name="address" value={profileData.address} onChange={updateProfile} /></div>

@@ -44,6 +44,8 @@ form h2 { margin: 0 0 9px; font: 600 clamp(1.9rem, 3vw, 2.45rem)/1.1 'Fraunces',
 .field input, .field select { width: 100%; min-height: 48px; padding: 0 14px; border: 1px solid var(--line); border-radius: 3px; outline: 0; color: var(--ink); background: #fff; transition: border-color .2s, box-shadow .2s; }
 .field input::placeholder { color: #a3afa8; }
 .field input:focus, .field select:focus { border-color: var(--moss); box-shadow: 0 0 0 3px rgba(21,87,127,.12); }
+.field select { cursor: pointer; }
+.conditional-field { margin-top: -5px; padding: 12px; border-left: 3px solid var(--moss); background: rgba(21,87,127,.045); }
 .password-field { position: relative; }
 .password-field input { padding-right: 48px; }
 .password-hint { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
