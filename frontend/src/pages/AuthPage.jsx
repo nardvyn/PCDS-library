@@ -15,7 +15,7 @@ const courseOptions = [
   ['Bachelor of Science in Hospitality Management', 'Bachelor of Science in Hospitality Management (BSHM)'],
 ]
 
-const yearLevelOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year']
+const yearLevelOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 const sectionOptions = ['A', 'B', 'C', 'D', 'E', 'F', 'OTHER']
 
 function AuthPage() {
