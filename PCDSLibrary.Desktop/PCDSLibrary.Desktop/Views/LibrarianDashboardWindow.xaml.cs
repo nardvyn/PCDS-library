@@ -551,9 +551,12 @@ namespace PCDSLibrary.Desktop.Views
             grid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new Binding(nameof(BorrowerData.FullName)), Width = 180 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Type", Binding = new Binding(nameof(BorrowerData.Role)), Width = 90 });
             grid.Columns.Add(new DataGridTextColumn { Header = "School ID", Binding = new Binding(nameof(BorrowerData.SchoolId)), Width = 125 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Course / Dept", Binding = new Binding(nameof(BorrowerData.Course)), Width = 150 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Section", Binding = new Binding(nameof(BorrowerData.Section)), Width = 100 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Verification", Binding = new Binding(nameof(BorrowerData.VerificationStatus)), Width = 170 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Course / Department", Binding = new Binding(nameof(BorrowerData.CourseOrDepartment)), Width = 180 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Year Level", Binding = new Binding(nameof(BorrowerData.YearLevel)), Width = 95 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Section", Binding = new Binding(nameof(BorrowerData.Section)), Width = 90 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Eligibility", Binding = new Binding(nameof(BorrowerData.EligibilityStatus)), Width = 130 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Valid Until", Binding = new Binding(nameof(BorrowerData.VerificationValidUntil)), Width = 125 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Verification", Binding = new Binding(nameof(BorrowerData.VerificationStatus)), Width = 150 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Account", Binding = new Binding(nameof(BorrowerData.AccountStatus)), Width = 100 });
             var refresh = CreateRequestButton("Refresh", "#00899A");
             refresh.Click += async (_, _) => await LoadBorrowersAsync(grid, status);

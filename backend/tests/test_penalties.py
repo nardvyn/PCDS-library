@@ -148,6 +148,9 @@ class PenaltyFlowTest(unittest.TestCase):
         profile = BorrowerProfile(
             user_id=self.borrower.user_id,
             verification_status="VERIFIED",
+            course="Bachelor of Science in Criminology",
+            year_level="4th Year",
+            section="A",
             verified_at=datetime.now(timezone.utc) - timedelta(days=366),
             verification_expires_at=datetime.now(timezone.utc) - timedelta(days=1),
         )
@@ -160,6 +163,14 @@ class PenaltyFlowTest(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertEqual(dashboard.get_json()["verification_status"], "REVIEW_REQUIRED")
         self.assertEqual(dashboard.get_json()["eligibility_status"], "REVIEW_REQUIRED")
+
+        records = self.client.get("/api/library/borrowers", headers={"Authorization": f"Bearer {self.token}"})
+        student_record = next(item for item in records.get_json()["borrowers"] if item["user_id"] == self.borrower.user_id)
+        self.assertEqual(student_record["course"], "Bachelor of Science in Criminology")
+        self.assertEqual(student_record["year_level"], "4th Year")
+        self.assertEqual(student_record["section"], "A")
+        self.assertEqual(student_record["eligibility_status"], "REVIEW_REQUIRED")
+        self.assertIsNotNone(student_record["verification_expires_at"])
 
         response = self.client.post(
             "/api/borrow-requests",

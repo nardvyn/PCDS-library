@@ -86,6 +86,12 @@ namespace PCDSLibrary.Desktop.Models
         [JsonPropertyName("section")] public string? Section { get; set; }
         [JsonPropertyName("department")] public string? Department { get; set; }
         [JsonPropertyName("verification_status")] public string VerificationStatus { get; set; } = "";
+        [JsonPropertyName("eligibility_status")] public string EligibilityStatus { get; set; } = "";
+        [JsonPropertyName("verification_expires_at")] public string? VerificationExpiresAt { get; set; }
+        public string CourseOrDepartment => Role == "TEACHER" ? (Department ?? "") : (Course ?? "");
+        public string VerificationValidUntil => DateTimeOffset.TryParse(VerificationExpiresAt, out var expiry)
+            ? expiry.ToLocalTime().ToString("MMM dd, yyyy")
+            : "Not set";
     }
 
     public class ReportsSummary

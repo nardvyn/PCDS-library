@@ -15,6 +15,7 @@ from app.models.penalty import Penalty
 from app.models.library_setting import LibrarySetting
 from app.models.user import User
 from app.services.audit_service import record_audit
+from app.services.borrower_eligibility import borrower_eligibility, effective_verification_status
 from app.services.email_service import send_penalty_emails, send_return_email
 from app.services.penalty_service import sync_active_overdue_penalties
 
@@ -286,7 +287,9 @@ def list_borrowers():
             "year_level": profile.year_level if profile else None,
             "section": profile.section if profile else None,
             "department": profile.department if profile else None,
-            "verification_status": profile.verification_status if profile else "NO_PROFILE",
+            "verification_status": effective_verification_status(profile),
+            "eligibility_status": borrower_eligibility(profile),
+            "verification_expires_at": profile.verification_expires_at.isoformat() if profile and profile.verification_expires_at else None,
         })
     return jsonify({"success": True, "borrowers": borrowers}), 200
 
