@@ -473,6 +473,18 @@ namespace PCDSLibrary.Desktop.Services
             }
         }
 
+        public async Task<LibraryListResponse> GetBookRecordsAsync()
+        {
+            try
+            {
+                return await _httpClient.GetFromJsonAsync<LibraryListResponse>("library/book-records") ?? new LibraryListResponse { Success = false, Message = "Invalid response from the server." };
+            }
+            catch (Exception error)
+            {
+                return new LibraryListResponse { Success = false, Message = error.Message };
+            }
+        }
+
         public async Task<OperationResponse> ProcessReturnAsync(int loanId, string condition)
         {
             try

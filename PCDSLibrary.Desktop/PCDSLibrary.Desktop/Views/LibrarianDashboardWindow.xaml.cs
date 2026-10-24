@@ -292,6 +292,13 @@ namespace PCDSLibrary.Desktop.Views
                 return;
             }
 
+            if (title == "Book Records")
+            {
+                content.Children.Add(CreateBookRecordsContent());
+                MainContent.Content = content;
+                return;
+            }
+
             if (title == "Borrowers")
             {
                 content.Children.Add(CreateBorrowersContent());
@@ -395,6 +402,49 @@ namespace PCDSLibrary.Desktop.Views
                     async () => await PromptAndProcessReturnAsync(loan.LoanId, list, status, overdueOnly, allowReturn)
                 );
                 list.Children.Add(row);
+            }
+        }
+
+        private StackPanel CreateBookRecordsContent()
+        {
+            var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
+            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
+            var list = new StackPanel();
+            var refresh = CreateRequestButton("Refresh", "#00899A");
+            refresh.Click += async (_, _) => await LoadBookRecordsAsync(list, status);
+            panel.Children.Add(refresh);
+            panel.Children.Add(status);
+            panel.Children.Add(new ScrollViewer { Content = list, MaxHeight = 560, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+            _ = LoadBookRecordsAsync(list, status);
+            return panel;
+        }
+
+        private async Task LoadBookRecordsAsync(StackPanel list, TextBlock status)
+        {
+            status.Text = "Loading complete circulation history...";
+            list.Children.Clear();
+            var result = await _apiService.GetBookRecordsAsync();
+            if (!result.Success)
+            {
+                status.Text = result.Message;
+                return;
+            }
+            status.Text = $"{result.Loans.Count} circulation record(s)";
+            if (result.Loans.Count == 0)
+            {
+                list.Children.Add(CreateRequestMessage("No book records yet.", "#547177"));
+                return;
+            }
+            foreach (var loan in result.Loans)
+            {
+                var returned = string.IsNullOrWhiteSpace(loan.ReturnedAt) ? "Not returned" : $"Returned {FormatRequestDate(loan.ReturnedAt)}";
+                var penalty = loan.PenaltyAmount > 0 ? $" • Penalty PHP {loan.PenaltyAmount:0.00} ({loan.PenaltyStatus})" : "";
+                list.Children.Add(CreateLibraryRow(
+                    loan.BookTitle,
+                    $"{loan.BorrowerName} ({loan.SchoolId}) • Accession {loan.AccessionNumber}",
+                    $"Borrowed {FormatRequestDate(loan.BorrowedAt)} • Due {FormatRequestDate(loan.DueDate)} • {returned} • {loan.Status}{penalty}",
+                    null,
+                    () => Task.CompletedTask));
             }
         }
 
@@ -1772,7 +1822,7 @@ namespace PCDSLibrary.Desktop.Views
             {
                 DashboardButton, BorrowRequestsButton, ActiveLoansButton,
                 BookReturnsButton, OverdueBooksButton, PenaltiesButton,
-                ManageBooksButton, BorrowersButton, NotificationsButton,
+                ManageBooksButton, BookRecordsButton, BorrowersButton, NotificationsButton,
                 ReportsButton, UserManagementButton, AuditLogsButton, SettingsButton
             })
             {
@@ -1858,6 +1908,16 @@ namespace PCDSLibrary.Desktop.Views
                 "View the book catalog and inspect book details.",
                 "📚",
                 ManageBooksButton
+            );
+        }
+
+        private void BookRecordsButton_Click(object sender, RoutedEventArgs e)
+        {
+            ShowModuleContent(
+                "Book Records",
+                "View the complete borrowing, return, overdue, and penalty history.",
+                "📋",
+                BookRecordsButton
             );
         }
 

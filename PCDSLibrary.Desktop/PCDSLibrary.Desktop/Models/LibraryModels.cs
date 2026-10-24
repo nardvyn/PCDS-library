@@ -54,7 +54,10 @@ namespace PCDSLibrary.Desktop.Models
         [JsonPropertyName("accession_number")] public string AccessionNumber { get; set; } = "";
         [JsonPropertyName("borrowed_at")] public string BorrowedAt { get; set; } = "";
         [JsonPropertyName("due_date")] public string DueDate { get; set; } = "";
+        [JsonPropertyName("returned_at")] public string ReturnedAt { get; set; } = "";
         [JsonPropertyName("late_days")] public int LateDays { get; set; }
+        [JsonPropertyName("penalty_amount")] public decimal PenaltyAmount { get; set; }
+        [JsonPropertyName("penalty_status")] public string PenaltyStatus { get; set; } = "NONE";
         [JsonPropertyName("status")] public string Status { get; set; } = "";
     }
 

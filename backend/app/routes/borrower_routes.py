@@ -10,6 +10,7 @@ from app.models.loan import Loan
 from app.models.notification import Notification
 from app.models.penalty import Penalty
 from app.models.library_setting import LibrarySetting
+from app.services.penalty_service import sync_active_overdue_penalties
 from app.models.user import User
 from app.models.library_setting import LibrarySetting
 
@@ -25,6 +26,7 @@ def borrower_dashboard():
         return jsonify({"success": False, "message": "User account was not found."}), 404
 
     now = datetime.now(timezone.utc)
+    sync_active_overdue_penalties(now)
     active_loans = Loan.query.filter_by(user_id=user_id, status="ACTIVE").order_by(Loan.due_date.asc()).all()
     returned_loans = Loan.query.filter(Loan.user_id == user_id, Loan.returned_at.isnot(None)).order_by(Loan.returned_at.desc()).all()
     requests = BorrowRequest.query.filter_by(user_id=user_id).order_by(BorrowRequest.requested_at.desc()).limit(5).all()
@@ -53,6 +55,16 @@ def borrower_dashboard():
         data["late_days"] = penalty.late_days if penalty else 0
         recent_returns.append(data)
 
+    active_loan_records = []
+    for loan in active_loans:
+        data = loan.to_dict()
+        penalty = Penalty.query.filter_by(loan_id=loan.loan_id).first()
+        data["penalty_amount"] = float(penalty.amount) if penalty else 0
+        data["penalty_status"] = penalty.status if penalty else "NONE"
+        data["late_days"] = penalty.late_days if penalty else 0
+        active_loan_records.append(data)
+    unpaid_penalties = sum((penalty.amount for penalty in Penalty.query.filter_by(user_id=user_id, status="UNPAID").all()), 0)
+
     return jsonify({
         "success": True,
         "borrowed_books": len(active_loans),
@@ -67,7 +79,8 @@ def borrower_dashboard():
         "borrowing_limit": borrowing_limit,
         "borrowing_used": borrowing_used,
         "borrowing_remaining": max(borrowing_limit - borrowing_used, 0),
-        "active_loans": [loan.to_dict() for loan in active_loans],
+        "active_loans": active_loan_records,
+        "unpaid_penalties": float(unpaid_penalties),
         "recent_returns": recent_returns,
         "recent_requests": [item.to_dict() for item in requests],
     }), 200

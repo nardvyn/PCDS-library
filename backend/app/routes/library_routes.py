@@ -16,6 +16,7 @@ from app.models.library_setting import LibrarySetting
 from app.models.user import User
 from app.services.audit_service import record_audit
 from app.services.email_service import send_penalty_emails, send_return_email
+from app.services.penalty_service import sync_active_overdue_penalties
 
 library_bp = Blueprint("library_operations", __name__, url_prefix="/api/library")
 
@@ -128,6 +129,24 @@ def list_active_loans():
     return jsonify({"success": True, "loans": [loan.to_dict() for loan in loans]}), 200
 
 
+@library_bp.get("/book-records")
+@jwt_required()
+def list_book_records():
+    if not staff_access_required():
+        return denied_response()
+    sync_active_overdue_penalties()
+    loans = Loan.query.order_by(Loan.borrowed_at.desc()).all()
+    records = []
+    for loan in loans:
+        data = loan.to_dict()
+        penalty = Penalty.query.filter_by(loan_id=loan.loan_id).first()
+        data["late_days"] = penalty.late_days if penalty else 0
+        data["penalty_amount"] = float(penalty.amount) if penalty else 0
+        data["penalty_status"] = penalty.status if penalty else "NONE"
+        records.append(data)
+    return jsonify({"success": True, "loans": records}), 200
+
+
 @library_bp.get("/overdue")
 @jwt_required()
 def list_overdue_loans():
@@ -168,10 +187,18 @@ def return_loan(loan_id):
 
     settings = get_library_settings()
     daily_penalty = Decimal(settings["daily_penalty"])
-    penalty = None
+    penalty = Penalty.query.filter_by(loan_id=loan.loan_id).first()
     if late_days:
-        penalty = Penalty(loan_id=loan.loan_id, user_id=loan.user_id, amount=Decimal(late_days) * daily_penalty, late_days=late_days, status="UNPAID")
-        db.session.add(penalty)
+        amount = Decimal(late_days) * daily_penalty
+        if penalty is None:
+            penalty = Penalty(loan_id=loan.loan_id, user_id=loan.user_id, amount=amount, late_days=late_days, status="UNPAID")
+            db.session.add(penalty)
+        else:
+            penalty.amount = amount
+            penalty.late_days = late_days
+            if penalty.status == "PAID":
+                penalty.status = "UNPAID"
+                penalty.paid_at = None
 
     condition_message = f" The book was marked {condition.lower()}." if condition != "GOOD" else ""
     penalty_message = f" An overdue penalty of PHP {Decimal(late_days) * daily_penalty:.2f} was recorded for {late_days} late day(s)." if late_days else ""
@@ -199,6 +226,7 @@ def return_loan(loan_id):
 def list_penalties():
     if not staff_access_required():
         return denied_response()
+    sync_active_overdue_penalties()
     status = str(request.args.get("status", "ALL")).upper()
     query = Penalty.query.order_by(Penalty.created_at.desc())
     if status in {"UNPAID", "PAID"}:
@@ -293,6 +321,7 @@ def send_notification():
 def reports_summary():
     if not staff_access_required():
         return denied_response()
+    sync_active_overdue_penalties()
     return jsonify({
         "success": True,
         "total_books": db.session.query(func.coalesce(func.sum(Book.total_copies), 0)).scalar(),

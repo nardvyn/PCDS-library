@@ -7,7 +7,7 @@ import api from '../services/api'
 import pcdsSeal from '../assets/pcds-seal.png'
 import './DashboardPage.css'
 
-const initialSummary = { borrowed_books: 0, pending_requests: 0, overdue_books: 0, returned_books: 0, unread_notifications: 0, borrowing_limit: 3, borrowing_used: 0, borrowing_remaining: 3, active_loans: [], recent_requests: [] }
+const initialSummary = { borrowed_books: 0, pending_requests: 0, overdue_books: 0, returned_books: 0, unread_notifications: 0, unpaid_penalties: 0, borrowing_limit: 3, borrowing_used: 0, borrowing_remaining: 3, active_loans: [], recent_requests: [] }
 const sectionPaths = {
   dashboard: '/dashboard', books: '/books', loans: '/my-loans', dueSoon: '/my-loans', overdue: '/my-loans', requests: '/my-requests',
   history: '/history', notifications: '/notifications', profile: '/profile',
@@ -142,6 +142,7 @@ function DashboardOverview({ user, firstName, summary, loading, error, onRetry, 
             <AccountRow label="Account role" value={user.role || 'STUDENT'} />
             <AccountRow label="School ID" value={user.school_id || 'Not available'} />
             <AccountRow label="Borrowing period" value={`${borrowingPeriod} ${dayLabel}`} />
+            <AccountRow label="Unpaid penalties" value={Number(summary.unpaid_penalties || 0).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })} valueClass={Number(summary.unpaid_penalties || 0) > 0 ? 'penalty-status' : ''} />
           </div>
         </div>
         <div className="borrowing-reminder">
@@ -595,6 +596,7 @@ function BorrowedBookCard({ loan }) {
         <div><dt>Due date</dt><dd>{formatDate(loan.due_date)}</dd></div>
       </dl>
       <div className="borrowed-book-footer"><span>Accession No. {loan.accession_number}</span><strong>{remainingLabel}</strong></div>
+      {Number(loan.penalty_amount || 0) > 0 && <div className="active-loan-penalty" role="status"><span>Current overdue penalty</span><strong>{Number(loan.penalty_amount).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })} · {loan.penalty_status}</strong></div>}
     </div>
   </article>
 }
@@ -617,6 +619,7 @@ function LoanItem({ loan }) {
     <div className={`loan-due-date ${timing?.isOverdue ? 'overdue' : timing?.daysRemaining <= 3 ? 'due-soon' : ''}`}>
       <span>Due date</span><strong>{dueDateLabel}</strong>
       {timingLabel && <span className="loan-timing-label" role="status">{timingLabel}</span>}
+      {Number(loan.penalty_amount || 0) > 0 && <span className="loan-penalty-label">Penalty: {Number(loan.penalty_amount).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })}</span>}
     </div>
   </div>
 }

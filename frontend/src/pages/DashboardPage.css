@@ -845,6 +845,9 @@ button { cursor: pointer; }
 .returned-book-card .returned-book-status { margin-top: auto; padding-top: 8px; font-size: 12px; }
 .returned-book-penalty { margin-top: 4px; color: #557278; font-size: 11px; font-weight: 700; }
 .returned-book-penalty.has-penalty { color: #a52f2f; }
+.penalty-status, .loan-penalty-label { color: #a52f2f !important; }
+.active-loan-penalty { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 10px 12px; border: 1px solid #e7b9b4; border-radius: 8px; background: #fff2f0; color: #8f2929; font-size: 12px; }
+.active-loan-penalty strong { text-align: right; }
 .returned-book-status.is-on-time { color: #18724a; }
 .returned-book-status.is-late { color: #a52f2f; }
 .returned-book-card-late { border-color: #e3b7b2; }

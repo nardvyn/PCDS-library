@@ -101,6 +101,9 @@
                         <Button x:Name="ManageBooksButton" Style="{StaticResource SidebarButtonStyle}" Click="ManageBooksButton_Click" AutomationProperties.Name="Browse books">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Browse books" VerticalAlignment="Center"/></StackPanel>
                         </Button>
+                        <Button x:Name="BookRecordsButton" Style="{StaticResource SidebarButtonStyle}" Click="BookRecordsButton_Click" AutomationProperties.Name="Book records">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Book records" VerticalAlignment="Center"/></StackPanel>
+                        </Button>
                         <Button x:Name="BorrowersButton" Style="{StaticResource SidebarButtonStyle}" Click="BorrowersButton_Click" AutomationProperties.Name="Borrowers">
                             <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE716;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Foreground="#BDE5E1"/><TextBlock Text="Borrowers" VerticalAlignment="Center"/></StackPanel>
                         </Button>

@@ -97,6 +97,34 @@ class PenaltyFlowTest(unittest.TestCase):
         self.assertEqual(response.get_json()["penalty_amount"], 0)
         self.assertIsNone(Penalty.query.filter_by(loan_id=loan.loan_id).first())
 
+    def test_active_overdue_loan_automatically_appears_in_penalties(self):
+        loan = self.create_loan(-2)
+
+        penalties = self.client.get("/api/library/penalties", headers={"Authorization": f"Bearer {self.token}"})
+
+        self.assertEqual(penalties.status_code, 200)
+        payload = penalties.get_json()
+        self.assertEqual(len(payload["penalties"]), 1)
+        self.assertEqual(payload["penalties"][0]["loan_id"], loan.loan_id)
+        self.assertEqual(payload["penalties"][0]["late_days"], 2)
+        self.assertEqual(payload["penalties"][0]["amount"], 20.0)
+        self.assertEqual(payload["unpaid_penalties"], 20.0)
+
+    def test_return_reuses_automatic_penalty_record(self):
+        loan = self.create_loan(-2)
+        self.client.get("/api/library/penalties", headers={"Authorization": f"Bearer {self.token}"})
+
+        with patch("app.routes.library_routes.send_penalty_emails"):
+            returned = self.client.post(
+                f"/api/library/loans/{loan.loan_id}/return",
+                json={"condition": "GOOD"},
+                headers={"Authorization": f"Bearer {self.token}"},
+            )
+
+        self.assertEqual(returned.status_code, 200)
+        self.assertEqual(Penalty.query.filter_by(loan_id=loan.loan_id).count(), 1)
+        self.assertEqual(Penalty.query.filter_by(loan_id=loan.loan_id).one().amount, 20)
+
     def test_account_approval_sends_email_automatically(self):
         profile = BorrowerProfile(user_id=self.borrower.user_id, verification_status="PENDING_VERIFICATION")
         db.session.add(profile)
