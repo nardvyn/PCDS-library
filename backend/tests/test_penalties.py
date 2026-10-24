@@ -169,6 +169,10 @@ class PenaltyFlowTest(unittest.TestCase):
         self.assertEqual(student_record["course"], "Bachelor of Science in Criminology")
         self.assertEqual(student_record["year_level"], "4th Year")
         self.assertEqual(student_record["section"], "A")
+        self.assertEqual(student_record["email"], self.borrower.email)
+        self.assertIn("contact_number", student_record)
+        self.assertIn("address", student_record)
+        self.assertIn("created_at", student_record)
         self.assertEqual(student_record["eligibility_status"], "REVIEW_REQUIRED")
         self.assertIsNotNone(student_record["verification_expires_at"])
 

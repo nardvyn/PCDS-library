@@ -78,6 +78,8 @@ namespace PCDSLibrary.Desktop.Models
         [JsonPropertyName("user_id")] public int UserId { get; set; }
         [JsonPropertyName("full_name")] public string FullName { get; set; } = "";
         [JsonPropertyName("email")] public string Email { get; set; } = "";
+        [JsonPropertyName("contact_number")] public string? ContactNumber { get; set; }
+        [JsonPropertyName("address")] public string? Address { get; set; }
         [JsonPropertyName("role")] public string Role { get; set; } = "";
         [JsonPropertyName("account_status")] public string AccountStatus { get; set; } = "";
         [JsonPropertyName("school_id_number")] public string SchoolId { get; set; } = "";
@@ -88,10 +90,14 @@ namespace PCDSLibrary.Desktop.Models
         [JsonPropertyName("verification_status")] public string VerificationStatus { get; set; } = "";
         [JsonPropertyName("eligibility_status")] public string EligibilityStatus { get; set; } = "";
         [JsonPropertyName("verification_expires_at")] public string? VerificationExpiresAt { get; set; }
+        [JsonPropertyName("created_at")] public string? CreatedAt { get; set; }
         public string CourseOrDepartment => Role == "TEACHER" ? (Department ?? "") : (Course ?? "");
         public string VerificationValidUntil => DateTimeOffset.TryParse(VerificationExpiresAt, out var expiry)
             ? expiry.ToLocalTime().ToString("MMM dd, yyyy")
             : "Not set";
+        public string RegisteredOn => DateTimeOffset.TryParse(CreatedAt, out var created)
+            ? created.ToLocalTime().ToString("MMM dd, yyyy")
+            : "Not available";
     }
 
     public class ReportsSummary

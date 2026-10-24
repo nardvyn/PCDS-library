@@ -280,6 +280,8 @@ def list_borrowers():
             "user_id": user.user_id,
             "full_name": user.full_name,
             "email": user.email,
+            "contact_number": (profile.contact_number if profile else None) or user.contact_number,
+            "address": (profile.address if profile else None) or user.address,
             "role": user.role,
             "account_status": user.account_status,
             "school_id_number": (profile.school_id_number if profile else None) or user.school_id,
@@ -290,6 +292,7 @@ def list_borrowers():
             "verification_status": effective_verification_status(profile),
             "eligibility_status": borrower_eligibility(profile),
             "verification_expires_at": profile.verification_expires_at.isoformat() if profile and profile.verification_expires_at else None,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
         })
     return jsonify({"success": True, "borrowers": borrowers}), 200
 

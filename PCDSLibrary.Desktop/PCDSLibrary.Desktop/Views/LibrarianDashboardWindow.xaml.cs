@@ -299,7 +299,7 @@ namespace PCDSLibrary.Desktop.Views
                 return;
             }
 
-            if (title == "Borrowers")
+            if (title == "Student/Teacher Records")
             {
                 content.Children.Add(CreateBorrowersContent());
                 MainContent.Content = content;
@@ -546,33 +546,121 @@ namespace PCDSLibrary.Desktop.Views
         private StackPanel CreateBorrowersContent()
         {
             var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
-            var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
-            var grid = new DataGrid { AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false, RowHeaderWidth = 0, RowHeight = 30, ColumnHeaderHeight = 32, FontSize = 13, MaxHeight = 560, Background = Brushes.White };
-            grid.Columns.Add(new DataGridTextColumn { Header = "Name", Binding = new Binding(nameof(BorrowerData.FullName)), Width = 180 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Type", Binding = new Binding(nameof(BorrowerData.Role)), Width = 90 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "School ID", Binding = new Binding(nameof(BorrowerData.SchoolId)), Width = 125 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Course / Department", Binding = new Binding(nameof(BorrowerData.CourseOrDepartment)), Width = 180 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Year Level", Binding = new Binding(nameof(BorrowerData.YearLevel)), Width = 95 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Section", Binding = new Binding(nameof(BorrowerData.Section)), Width = 90 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Eligibility", Binding = new Binding(nameof(BorrowerData.EligibilityStatus)), Width = 130 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Valid Until", Binding = new Binding(nameof(BorrowerData.VerificationValidUntil)), Width = 125 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Verification", Binding = new Binding(nameof(BorrowerData.VerificationStatus)), Width = 150 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Account", Binding = new Binding(nameof(BorrowerData.AccountStatus)), Width = 100 });
+            var records = new List<BorrowerData>();
+            var status = new TextBlock { Margin = new Thickness(0, 10, 0, 10), MinHeight = 20, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
+            var search = new TextBox { Height = 40, MinWidth = 300, Padding = new Thickness(12, 8, 12, 8), FontSize = 13, ToolTip = "Search name, school ID, course, section, or email" };
+            AutomationProperties.SetName(search, "Search student and teacher records");
+            var roleFilter = new ComboBox { Height = 40, Width = 155, Margin = new Thickness(10, 0, 10, 0), Padding = new Thickness(10, 5, 10, 5), ItemsSource = new[] { "ALL RECORDS", "STUDENT", "TEACHER" }, SelectedIndex = 0 };
             var refresh = CreateRequestButton("Refresh", "#00899A");
-            refresh.Click += async (_, _) => await LoadBorrowersAsync(grid, status);
-            panel.Children.Add(refresh);
+            refresh.MinWidth = 100;
+            refresh.Height = 40;
+            var toolbar = new DockPanel { LastChildFill = true };
+            DockPanel.SetDock(refresh, Dock.Right);
+            DockPanel.SetDock(roleFilter, Dock.Right);
+            toolbar.Children.Add(refresh);
+            toolbar.Children.Add(roleFilter);
+            toolbar.Children.Add(search);
+            panel.Children.Add(new Border { Padding = new Thickness(14), Background = Brushes.White, BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Child = toolbar });
+
+            var summary = new UniformGrid { Columns = 4, Margin = new Thickness(0, 12, 0, 12) };
+            var allCount = new TextBlock();
+            var studentCount = new TextBlock();
+            var teacherCount = new TextBlock();
+            var reviewCount = new TextBlock();
+            summary.Children.Add(CreateRecordMetric("Total records", allCount, "#12363D"));
+            summary.Children.Add(CreateRecordMetric("Students", studentCount, "#00899A"));
+            summary.Children.Add(CreateRecordMetric("Teachers", teacherCount, "#31565C"));
+            summary.Children.Add(CreateRecordMetric("Needs review", reviewCount, "#A6533D"));
+            panel.Children.Add(summary);
             panel.Children.Add(status);
-            panel.Children.Add(grid);
-            _ = LoadBorrowersAsync(grid, status);
+
+            var list = new StackPanel();
+            panel.Children.Add(new ScrollViewer { MaxHeight = 525, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = list });
+
+            void RenderRecords()
+            {
+                var query = search.Text.Trim();
+                var selectedRole = roleFilter.SelectedItem?.ToString() ?? "ALL RECORDS";
+                var filtered = records.Where(record =>
+                    (selectedRole == "ALL RECORDS" || record.Role == selectedRole) &&
+                    (string.IsNullOrWhiteSpace(query) || new[] { record.FullName, record.SchoolId, record.Course, record.Department, record.YearLevel, record.Section, record.Email }
+                        .Any(value => !string.IsNullOrWhiteSpace(value) && value.Contains(query, StringComparison.OrdinalIgnoreCase)))).ToList();
+                list.Children.Clear();
+                foreach (var record in filtered)
+                    list.Children.Add(CreateBorrowerRecordCard(record));
+                if (filtered.Count == 0)
+                    list.Children.Add(new TextBlock { Text = "No matching student or teacher records.", Margin = new Thickness(16, 28, 16, 28), HorizontalAlignment = HorizontalAlignment.Center, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+                status.Text = $"Showing {filtered.Count} of {records.Count} record(s)";
+            }
+
+            async Task ReloadRecordsAsync()
+            {
+                refresh.IsEnabled = false;
+                status.Text = "Loading student and teacher records...";
+                var result = await _apiService.GetBorrowersAsync();
+                refresh.IsEnabled = true;
+                if (!result.Success) { status.Text = result.Message; return; }
+                records = result.Borrowers;
+                allCount.Text = records.Count.ToString();
+                studentCount.Text = records.Count(item => item.Role == "STUDENT").ToString();
+                teacherCount.Text = records.Count(item => item.Role == "TEACHER").ToString();
+                reviewCount.Text = records.Count(item => item.EligibilityStatus == "REVIEW_REQUIRED").ToString();
+                RenderRecords();
+            }
+
+            search.TextChanged += (_, _) => RenderRecords();
+            roleFilter.SelectionChanged += (_, _) => RenderRecords();
+            refresh.Click += async (_, _) => await ReloadRecordsAsync();
+            _ = ReloadRecordsAsync();
             return panel;
         }
 
-        private async Task LoadBorrowersAsync(DataGrid grid, TextBlock status)
+        private Border CreateRecordMetric(string label, TextBlock value, string color)
         {
-            status.Text = "Loading borrowers...";
-            var result = await _apiService.GetBorrowersAsync();
-            grid.ItemsSource = result.Success ? result.Borrowers : null;
-            status.Text = result.Success ? $"{result.Borrowers.Count} borrower(s)" : result.Message;
+            value.Text = "—";
+            value.FontSize = 22;
+            value.FontWeight = FontWeights.Bold;
+            value.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+            var content = new StackPanel();
+            content.Children.Add(new TextBlock { Text = label, FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            content.Children.Add(value);
+            return new Border { Margin = new Thickness(0, 0, 10, 0), Padding = new Thickness(15, 12, 15, 12), Background = Brushes.White, BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Child = content };
+        }
+
+        private Border CreateBorrowerRecordCard(BorrowerData record)
+        {
+            var card = new Border { Margin = new Thickness(0, 0, 0, 10), Padding = new Thickness(18, 15, 18, 15), Background = Brushes.White, BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10) };
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.4, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.25, GridUnitType.Star) });
+
+            var identity = new StackPanel { Margin = new Thickness(0, 0, 18, 0) };
+            identity.Children.Add(new TextBlock { Text = record.FullName, FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D")) });
+            identity.Children.Add(new TextBlock { Text = $"{record.Role}  •  {record.SchoolId}", Margin = new Thickness(0, 4, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            identity.Children.Add(new TextBlock { Text = record.Email, Margin = new Thickness(0, 7, 0, 0), FontSize = 11, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#31565C")) });
+            identity.Children.Add(new TextBlock { Text = string.IsNullOrWhiteSpace(record.ContactNumber) ? "No contact number" : record.ContactNumber, Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            grid.Children.Add(identity);
+
+            var academic = new StackPanel { Margin = new Thickness(0, 0, 18, 0) };
+            academic.Children.Add(new TextBlock { Text = record.Role == "TEACHER" ? "Department" : "Course and class", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#789094")) });
+            academic.Children.Add(new TextBlock { Text = string.IsNullOrWhiteSpace(record.CourseOrDepartment) ? "Not provided" : record.CourseOrDepartment, Margin = new Thickness(0, 4, 0, 0), FontSize = 13, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D")) });
+            if (record.Role == "STUDENT")
+                academic.Children.Add(new TextBlock { Text = $"{record.YearLevel ?? "No year level"}  •  {record.Section ?? "No section"}", Margin = new Thickness(0, 4, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            academic.Children.Add(new TextBlock { Text = string.IsNullOrWhiteSpace(record.Address) ? "No address provided" : record.Address, Margin = new Thickness(0, 8, 0, 0), FontSize = 11, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            Grid.SetColumn(academic, 1);
+            grid.Children.Add(academic);
+
+            var eligibilityColor = record.EligibilityStatus == "ACTIVE" ? "#18724A" : record.EligibilityStatus == "REVIEW_REQUIRED" ? "#A6533D" : "#547177";
+            var state = new StackPanel();
+            state.Children.Add(new TextBlock { Text = record.EligibilityStatus.Replace('_', ' '), FontSize = 12, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(eligibilityColor)) });
+            state.Children.Add(new TextBlock { Text = $"Verification: {record.VerificationStatus}", Margin = new Thickness(0, 5, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#31565C")) });
+            state.Children.Add(new TextBlock { Text = $"Valid until: {record.VerificationValidUntil}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(eligibilityColor)) });
+            state.Children.Add(new TextBlock { Text = $"Account: {record.AccountStatus}  •  Registered: {record.RegisteredOn}", Margin = new Thickness(0, 8, 0, 0), FontSize = 10, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#789094")) });
+            Grid.SetColumn(state, 2);
+            grid.Children.Add(state);
+            card.Child = grid;
+            return card;
         }
 
         private StackPanel CreateNotificationComposer()
@@ -1959,8 +2047,8 @@ namespace PCDSLibrary.Desktop.Views
             RoutedEventArgs e)
         {
             ShowModuleContent(
-                "Borrowers",
-                "View students, teachers, and histories.",
+                "Student/Teacher Records",
+                "Search complete profiles, courses, class details, verification validity, and account status.",
                 "👥",
                 BorrowersButton
             );
