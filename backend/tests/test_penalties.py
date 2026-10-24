@@ -97,6 +97,27 @@ class PenaltyFlowTest(unittest.TestCase):
         self.assertEqual(response.get_json()["penalty_amount"], 0)
         self.assertIsNone(Penalty.query.filter_by(loan_id=loan.loan_id).first())
 
+    def test_book_records_include_active_and_returned_loans(self):
+        active_loan = self.create_loan(-3)
+        returned_loan = self.create_loan(2)
+        returned_loan.status = "RETURNED"
+        returned_loan.returned_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+        response = self.client.get(
+            "/api/library/book-records",
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        records = {record["loan_id"]: record for record in response.get_json()["loans"]}
+        self.assertEqual(set(records), {active_loan.loan_id, returned_loan.loan_id})
+        self.assertEqual(records[active_loan.loan_id]["status"], "ACTIVE")
+        self.assertEqual(records[active_loan.loan_id]["late_days"], 3)
+        self.assertEqual(records[active_loan.loan_id]["penalty_amount"], 30.0)
+        self.assertEqual(records[returned_loan.loan_id]["status"], "RETURNED")
+        self.assertIsNotNone(records[returned_loan.loan_id]["returned_at"])
+
     def test_active_overdue_loan_automatically_appears_in_penalties(self):
         loan = self.create_loan(-2)
 
