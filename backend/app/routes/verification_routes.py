@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request, send_file
@@ -11,6 +11,7 @@ from app.models.notification import Notification
 from app.models.user import User
 from app.services.audit_service import record_audit
 from app.services.email_service import send_account_approval_email, send_account_status_email
+from app.services.borrower_eligibility import STUDENT_VERIFICATION_DAYS, borrower_eligibility, effective_verification_status
 
 verification_bp = Blueprint("verification", __name__, url_prefix="/api/verification")
 
@@ -69,6 +70,7 @@ def list_profiles():
             "verification_status": "NO_PROFILE",
             "verified_by": None,
             "verified_at": None,
+            "verification_expires_at": None,
         }
         profiles.append({
             **profile_data,
@@ -80,6 +82,8 @@ def list_profiles():
             "account_status": user.account_status,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "profile_complete": borrower_profile_is_complete(profile, user.role) if user.role in {"STUDENT", "TEACHER"} else False,
+            "eligibility_status": borrower_eligibility(profile),
+            "effective_verification_status": effective_verification_status(profile),
             "school_id_image_available": bool(
                 profile
                 and profile.school_id_image
@@ -109,10 +113,16 @@ def update_profile_status(profile_id):
     actor_id = int(get_jwt_identity())
     profile.verification_status = status
     profile.verified_by = actor_id
-    profile.verified_at = datetime.now(timezone.utc)
+    verified_at = datetime.now(timezone.utc)
+    profile.verified_at = verified_at
+    profile.verification_expires_at = (
+        verified_at + timedelta(days=STUDENT_VERIFICATION_DAYS)
+        if status == "VERIFIED" and profile.user.role == "STUDENT"
+        else None
+    )
     profile.user.account_status = "SUSPENDED" if status == "SUSPENDED" else "ACTIVE"
     notification_details = {
-        "VERIFIED": ("School profile verified", "Your school profile has been verified. You can now submit borrow requests."),
+        "VERIFIED": ("School profile verified", f"Your school profile has been verified. Student verification is valid for {STUDENT_VERIFICATION_DAYS} days." if profile.user.role == "STUDENT" else "Your school profile has been verified. You can now submit borrow requests."),
         "REJECTED": ("School profile rejected", "Your school profile was rejected. Please contact the library for next steps."),
         "SUSPENDED": ("Account suspended", "Your library account has been suspended. Please contact the library for assistance."),
     }
@@ -131,6 +141,8 @@ def update_profile_status(profile_id):
             record_audit(actor_id, "ACCOUNT_REJECTION_EMAIL_FAILED", "USER", profile.user_id, str(error))
             db.session.commit()
     response_message = f"Profile {status.lower()}."
+    if status == "VERIFIED" and profile.verification_expires_at:
+        response_message += f" Student verification is valid until {profile.verification_expires_at.strftime('%B %d, %Y')}."
     if status == "VERIFIED" and email_sent is True:
         response_message += f" Approval email sent automatically to {profile.user.email}."
     elif status == "VERIFIED" and email_sent is False:

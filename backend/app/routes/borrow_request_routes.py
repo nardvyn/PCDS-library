@@ -17,6 +17,7 @@ from app.models.library_setting import LibrarySetting
 from app.models.user import User
 from app.services.audit_service import record_audit
 from app.services.email_service import send_borrow_request_email
+from app.services.borrower_eligibility import student_verification_expired
 
 borrow_requests_bp = Blueprint("borrow_requests", __name__, url_prefix="/api/borrow-requests")
 
@@ -74,6 +75,8 @@ def create_borrow_request():
     profile = BorrowerProfile.query.filter_by(user_id=user_id).first()
     if not profile or profile.verification_status != "VERIFIED":
         return jsonify({"success": False, "message": "Your school profile must be verified before borrowing books."}), 403
+    if student_verification_expired(profile):
+        return jsonify({"success": False, "message": "Your student verification has expired. Please ask the library administrator to renew it before borrowing another book."}), 403
 
     borrow_limit = get_borrow_limit(user)
     borrow_usage = get_borrow_usage(user_id)
@@ -171,6 +174,10 @@ def update_borrow_request(request_id):
         return jsonify({"success": False, "message": "Status must be APPROVED or REJECTED."}), 400
     if item.status != "PENDING":
         return jsonify({"success": False, "message": "This request has already been processed."}), 409
+    if status == "APPROVED" and item.user.account_status != "ACTIVE":
+        return jsonify({"success": False, "message": "This borrower account is suspended or inactive and cannot receive a new loan."}), 409
+    if status == "APPROVED" and student_verification_expired(item.user.borrower_profile):
+        return jsonify({"success": False, "message": "This student's verification has expired. Renew the student profile before approving this request."}), 409
     book = item.book
     if status == "APPROVED" and book is None:
         book = Book.query.filter_by(accession_number=item.accession_number).first()

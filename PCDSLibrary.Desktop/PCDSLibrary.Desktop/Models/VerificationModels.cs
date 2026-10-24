@@ -43,6 +43,15 @@ namespace PCDSLibrary.Desktop.Models
         [JsonPropertyName("verification_status")]
         public string VerificationStatus { get; set; } = "";
 
+        [JsonPropertyName("effective_verification_status")]
+        public string EffectiveVerificationStatus { get; set; } = "";
+
+        [JsonPropertyName("eligibility_status")]
+        public string EligibilityStatus { get; set; } = "";
+
+        [JsonPropertyName("verification_expires_at")]
+        public string? VerificationExpiresAt { get; set; }
+
         [JsonPropertyName("role")]
         public string Role { get; set; } = "";
 

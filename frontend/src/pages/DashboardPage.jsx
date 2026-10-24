@@ -139,6 +139,8 @@ function DashboardOverview({ user, firstName, summary, loading, error, onRetry, 
           <div className="account-information">
             <AccountRow label="Account status" value={user.account_status || 'ACTIVE'} valueClass="active-status" />
             <AccountRow label="Verification" value={summary.verification_status || 'PENDING_VERIFICATION'} valueClass={summary.verification_status === 'VERIFIED' ? 'active-status' : ''} />
+            <AccountRow label="Student eligibility" value={summary.eligibility_status || 'PENDING_VERIFICATION'} valueClass={summary.eligibility_status === 'ACTIVE' ? 'active-status' : ''} />
+            {summary.verification_expires_at && <AccountRow label="Verification valid until" value={new Date(summary.verification_expires_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })} valueClass={summary.eligibility_status === 'REVIEW_REQUIRED' ? 'penalty-status' : ''} />}
             <AccountRow label="Account role" value={user.role || 'STUDENT'} />
             <AccountRow label="School ID" value={user.school_id || 'Not available'} />
             <AccountRow label="Borrowing period" value={`${borrowingPeriod} ${dayLabel}`} />

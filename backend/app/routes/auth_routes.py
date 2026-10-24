@@ -209,6 +209,9 @@ def complete_profile():
     profile.address = str(data.get("address", "")).strip() or None
     profile.school_id_image = filename
     profile.verification_status = "PENDING_VERIFICATION"
+    profile.verified_by = None
+    profile.verified_at = None
+    profile.verification_expires_at = None
     user.role = user_type
     if not user.borrower_profile:
         db.session.add(profile)
@@ -259,6 +262,7 @@ def upload_school_id():
     profile.verification_status = "PENDING_VERIFICATION"
     profile.verified_by = None
     profile.verified_at = None
+    profile.verification_expires_at = None
     try:
         db.session.commit()
     except Exception:

@@ -19,6 +19,7 @@ class BorrowerProfile(db.Model):
     verification_status = db.Column(db.Enum("PENDING_VERIFICATION", "VERIFIED", "REJECTED", "SUSPENDED", name="verification_statuses"), nullable=False, default="PENDING_VERIFICATION")
     verified_by = db.Column(db.Integer, db.ForeignKey("users.user_id"), nullable=True)
     verified_at = db.Column(db.DateTime, nullable=True)
+    verification_expires_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -39,4 +40,5 @@ class BorrowerProfile(db.Model):
             "verification_status": self.verification_status,
             "verified_by": self.verified_by,
             "verified_at": self.verified_at.isoformat() if self.verified_at else None,
+            "verification_expires_at": self.verification_expires_at.isoformat() if self.verification_expires_at else None,
         }

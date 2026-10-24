@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from app.extensions import db
+from app.services.borrower_eligibility import borrower_eligibility, effective_verification_status
 
 
 class BorrowRequest(db.Model):
@@ -37,7 +38,9 @@ class BorrowRequest(db.Model):
             "borrower_department": profile.department if profile else "",
             "borrower_address": ((profile.address if profile else None) or (self.user.address if self.user else "")),
             "borrower_account_status": self.user.account_status if self.user else "",
-            "borrower_verification_status": profile.verification_status if profile else "NO_PROFILE",
+            "borrower_verification_status": effective_verification_status(profile),
+            "borrower_eligibility_status": borrower_eligibility(profile),
+            "borrower_verification_expires_at": profile.verification_expires_at.isoformat() if profile and profile.verification_expires_at else None,
             "book_id": self.book_id,
             "book_title": self.book.title if self.book else (self.requested_title or "Unknown book"),
             "author": (self.book.author if self.book else None) or (self.requested_author or ""),

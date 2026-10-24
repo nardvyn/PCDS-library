@@ -46,6 +46,8 @@ namespace PCDSLibrary.Desktop.Models
         [JsonPropertyName("borrower_address")] public string BorrowerAddress { get; set; } = "";
         [JsonPropertyName("borrower_account_status")] public string BorrowerAccountStatus { get; set; } = "";
         [JsonPropertyName("borrower_verification_status")] public string BorrowerVerificationStatus { get; set; } = "";
+        [JsonPropertyName("borrower_eligibility_status")] public string BorrowerEligibilityStatus { get; set; } = "";
+        [JsonPropertyName("borrower_verification_expires_at")] public string? BorrowerVerificationExpiresAt { get; set; }
 
         [JsonPropertyName("book_title")]
         public string BookTitle { get; set; } = "";

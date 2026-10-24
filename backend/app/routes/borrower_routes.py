@@ -11,6 +11,7 @@ from app.models.notification import Notification
 from app.models.penalty import Penalty
 from app.models.library_setting import LibrarySetting
 from app.services.penalty_service import sync_active_overdue_penalties
+from app.services.borrower_eligibility import borrower_eligibility, effective_verification_status
 from app.models.user import User
 from app.models.library_setting import LibrarySetting
 
@@ -72,7 +73,9 @@ def borrower_dashboard():
         "overdue_books": overdue_books,
         "returned_books": len(returned_loans),
         "unread_notifications": unread_notifications,
-        "verification_status": profile.verification_status if profile else "PENDING_VERIFICATION",
+        "verification_status": effective_verification_status(profile, now),
+        "eligibility_status": borrower_eligibility(profile, now),
+        "verification_expires_at": profile.verification_expires_at.isoformat() if profile and profile.verification_expires_at else None,
         "school_id_image_available": school_id_image_available,
         "borrowing_period": borrowing_period,
         "daily_penalty": daily_penalty,

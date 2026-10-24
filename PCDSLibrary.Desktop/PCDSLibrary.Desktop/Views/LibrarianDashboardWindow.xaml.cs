@@ -761,7 +761,7 @@ namespace PCDSLibrary.Desktop.Views
 
         private void UpdatePendingUsersBadge(IReadOnlyCollection<VerificationProfileData> profiles)
         {
-            var pendingCount = profiles.Count(profile => profile.VerificationStatus == "PENDING_VERIFICATION");
+            var pendingCount = profiles.Count(profile => profile.VerificationStatus == "PENDING_VERIFICATION" || profile.EligibilityStatus == "REVIEW_REQUIRED");
             PendingUsersCountText.Text = pendingCount > 99 ? "99+" : pendingCount.ToString();
             PendingUsersBadge.Visibility = pendingCount > 0 ? Visibility.Visible : Visibility.Collapsed;
             PendingUsersButtonTooltip(pendingCount);
@@ -783,7 +783,8 @@ namespace PCDSLibrary.Desktop.Views
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(320) });
             var details = new StackPanel();
             details.Children.Add(new TextBlock { Text = profile.FullName, FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D")) });
-            details.Children.Add(new TextBlock { Text = $"{profile.Role} • {profile.AccountStatus} • {profile.VerificationStatus}", Margin = new Thickness(0, 5, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            var displayedVerification = string.IsNullOrWhiteSpace(profile.EffectiveVerificationStatus) ? profile.VerificationStatus : profile.EffectiveVerificationStatus;
+            details.Children.Add(new TextBlock { Text = $"{profile.Role} • {profile.AccountStatus} • {displayedVerification}", Margin = new Thickness(0, 5, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             details.Children.Add(new TextBlock { Text = $"School/Employee ID: {profile.SchoolIdNumber ?? "Not provided"}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             details.Children.Add(new TextBlock { Text = profile.Email, Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#789094")) });
             var academicDetails = profile.Role == "TEACHER"
@@ -795,6 +796,8 @@ namespace PCDSLibrary.Desktop.Views
                 details.Children.Add(new TextBlock { Text = $"Phone: {profile.ContactNumber}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             if (!string.IsNullOrWhiteSpace(profile.Address))
                 details.Children.Add(new TextBlock { Text = $"Address: {profile.Address}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            if (!string.IsNullOrWhiteSpace(profile.VerificationExpiresAt))
+                details.Children.Add(new TextBlock { Text = $"Student verification valid until: {FormatRequestDate(profile.VerificationExpiresAt)}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(profile.EligibilityStatus == "REVIEW_REQUIRED" ? "#A6533D" : "#18724A")) });
             if (profile.Role is "STUDENT" or "TEACHER" && !profile.SchoolIdImageAvailable)
                 details.Children.Add(new TextBlock { Text = "School ID image unavailable. Ask the borrower to resubmit their profile.", Margin = new Thickness(0, 5, 0, 0), FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A6533D")), TextWrapping = TextWrapping.Wrap });
             details.Children.Add(new TextBlock { Text = $"Registered: {FormatRequestDate(profile.CreatedAt ?? "")}", Margin = new Thickness(0, 3, 0, 0), FontSize = 10, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#789094")) });
@@ -809,6 +812,8 @@ namespace PCDSLibrary.Desktop.Views
             }
             if (profile.ProfileId.HasValue && (profile.Role == "STUDENT" || profile.Role == "TEACHER"))
             {
+                if (profile.ProfileComplete && profile.EligibilityStatus == "REVIEW_REQUIRED")
+                    AddVerificationAction(actions, "Renew 1 year", "VERIFIED", "#18724A", profile, list);
                 if (profile.ProfileComplete && profile.VerificationStatus is "PENDING_VERIFICATION" or "REJECTED" or "SUSPENDED")
                     AddVerificationAction(actions, "Verify", "VERIFIED", "#18724A", profile, list);
                 if (profile.VerificationStatus == "PENDING_VERIFICATION")
@@ -1016,7 +1021,9 @@ namespace PCDSLibrary.Desktop.Views
             details.Children.Add(new TextBlock { Text = $"Email: {(string.IsNullOrWhiteSpace(request.BorrowerEmail) ? "Not available" : request.BorrowerEmail)} • Contact: {(string.IsNullOrWhiteSpace(request.BorrowerContact) ? "Not available" : request.BorrowerContact)}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             if (!string.IsNullOrWhiteSpace(request.BorrowerAddress))
                 details.Children.Add(new TextBlock { Text = $"Address: {request.BorrowerAddress}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
-            details.Children.Add(new TextBlock { Text = $"Account: {request.BorrowerAccountStatus} • Verification: {request.BorrowerVerificationStatus}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#31565C")) });
+            details.Children.Add(new TextBlock { Text = $"Account: {request.BorrowerAccountStatus} • Verification: {request.BorrowerVerificationStatus} • Eligibility: {request.BorrowerEligibilityStatus}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#31565C")) });
+            if (!string.IsNullOrWhiteSpace(request.BorrowerVerificationExpiresAt))
+                details.Children.Add(new TextBlock { Text = $"Verification valid until: {FormatRequestDate(request.BorrowerVerificationExpiresAt)}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(request.BorrowerEligibilityStatus == "REVIEW_REQUIRED" ? "#A6533D" : "#547177")) });
             details.Children.Add(new TextBlock { Text = $"Call number: {request.CallNumber} • Accession: {request.AccessionNumber}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
             if (!string.IsNullOrWhiteSpace(request.Author))
                 details.Children.Add(new TextBlock { Text = $"Author: {request.Author}", Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });

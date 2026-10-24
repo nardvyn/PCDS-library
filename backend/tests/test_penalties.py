@@ -140,6 +140,45 @@ class PenaltyFlowTest(unittest.TestCase):
             self.assertIn("sent automatically", approved.get_json()["message"])
             send_email.assert_called_once()
             self.assertEqual(send_email.call_args.args[0].email, self.borrower.email)
+            db.session.refresh(profile)
+            self.assertIsNotNone(profile.verification_expires_at)
+            self.assertEqual((profile.verification_expires_at.date() - profile.verified_at.date()).days, 365)
+
+    def test_expired_student_verification_blocks_new_borrow_request(self):
+        profile = BorrowerProfile(
+            user_id=self.borrower.user_id,
+            verification_status="VERIFIED",
+            verified_at=datetime.now(timezone.utc) - timedelta(days=366),
+            verification_expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+        )
+        book = Book(title="Eligibility Test", author="Test Author", accession_number="ELIG-1", total_copies=1, available_copies=1)
+        db.session.add_all([profile, book])
+        db.session.commit()
+        borrower_token = create_access_token(identity=str(self.borrower.user_id), additional_claims={"role": "STUDENT"})
+
+        dashboard = self.client.get("/api/borrower/dashboard", headers={"Authorization": f"Bearer {borrower_token}"})
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertEqual(dashboard.get_json()["verification_status"], "REVIEW_REQUIRED")
+        self.assertEqual(dashboard.get_json()["eligibility_status"], "REVIEW_REQUIRED")
+
+        response = self.client.post(
+            "/api/borrow-requests",
+            json={"book_id": book.book_id},
+            headers={"Authorization": f"Bearer {borrower_token}"},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("expired", response.get_json()["message"].lower())
+
+        pending = BorrowRequest(user_id=self.borrower.user_id, book_id=book.book_id, status="PENDING")
+        db.session.add(pending)
+        db.session.commit()
+        approval = self.client.patch(
+            f"/api/borrow-requests/{pending.request_id}",
+            json={"status": "APPROVED"},
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+        self.assertEqual(approval.status_code, 409)
+        self.assertIn("expired", approval.get_json()["message"].lower())
 
 
 if __name__ == "__main__":
