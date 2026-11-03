@@ -4,12 +4,12 @@
              xmlns:local="clr-namespace:PCDSLibrary.Desktop"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-        <SolidColorBrush x:Key="InkBrush" Color="#12363D"/>
-        <SolidColorBrush x:Key="MutedBrush" Color="#547177"/>
-        <SolidColorBrush x:Key="LineBrush" Color="#CFE0E1"/>
-        <SolidColorBrush x:Key="CanvasBrush" Color="#F4F9F8"/>
-        <SolidColorBrush x:Key="PrimaryBrush" Color="#00899A"/>
-        <SolidColorBrush x:Key="PrimaryDeepBrush" Color="#006572"/>
+        <SolidColorBrush x:Key="InkBrush" Color="#102F35"/>
+        <SolidColorBrush x:Key="MutedBrush" Color="#557177"/>
+        <SolidColorBrush x:Key="LineBrush" Color="#D9E6E5"/>
+        <SolidColorBrush x:Key="CanvasBrush" Color="#F5F8F8"/>
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#087F8C"/>
+        <SolidColorBrush x:Key="PrimaryDeepBrush" Color="#075F69"/>
         <SolidColorBrush x:Key="SidebarBrush" Color="#006B78"/>
         <SolidColorBrush x:Key="SidebarDeepBrush" Color="#004C58"/>
         <SolidColorBrush x:Key="AccentBrush" Color="#F2BE53"/>
@@ -24,7 +24,7 @@
             <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="13,0"/>
-            <Setter Property="MinHeight" Value="38"/>
+            <Setter Property="MinHeight" Value="40"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -33,7 +33,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8"
+                                CornerRadius="9"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -166,20 +166,27 @@
             <Setter Property="CanUserResizeRows" Value="False"/>
             <Setter Property="RowHeaderWidth" Value="0"/>
             <Setter Property="EnableRowVirtualization" Value="True"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
         </Style>
 
         <Style TargetType="{x:Type DataGridColumnHeader}">
             <Setter Property="Background" Value="#EFF8F7"/>
             <Setter Property="Foreground" Value="#31565C"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Padding" Value="14,12"/>
             <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
         </Style>
 
         <Style TargetType="{x:Type DataGridRow}">
-            <Setter Property="MinHeight" Value="42"/>
+            <Setter Property="MinHeight" Value="52"/>
+            <Setter Property="BorderThickness" Value="0"/>
             <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EDF7F6"/>
+                </Trigger>
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Background" Value="#DFF1EF"/>
                     <Setter Property="Foreground" Value="{StaticResource InkBrush}"/>

@@ -360,7 +360,25 @@ namespace PCDSLibrary.Desktop.Services
             {
                 var response = await _httpClient.PatchAsJsonAsync($"borrow-requests/{requestId}", new { status });
                 var result = await response.Content.ReadFromJsonAsync<BorrowRequestResponse>();
-                return result ?? new BorrowRequestResponse { Success = false, Message = "Invalid response from the server." };
+                if (result == null)
+                {
+                    return new BorrowRequestResponse
+                    {
+                        Success = false,
+                        Message = $"The server returned an invalid response (HTTP {(int)response.StatusCode})."
+                    };
+                }
+
+                if (!response.IsSuccessStatusCode && result.Success)
+                {
+                    return new BorrowRequestResponse
+                    {
+                        Success = false,
+                        Message = $"The server could not process the request (HTTP {(int)response.StatusCode})."
+                    };
+                }
+
+                return result;
             }
             catch (Exception error)
             {

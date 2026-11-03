@@ -11,6 +11,8 @@ namespace PCDSLibrary.Desktop.Views
         private readonly ApiService _apiService = new();
         private readonly DispatcherTimer _retryTimer;
         private bool _isChecking;
+        private bool _hasConnected;
+        private int _consecutiveFailures;
 
         public ConnectionStatusControl()
         {
@@ -31,28 +33,43 @@ namespace PCDSLibrary.Desktop.Views
                 return;
 
             _isChecking = true;
-            ConnectionText.Text = "Checking library server...";
-            ConnectionIndicator.Fill = new SolidColorBrush(Color.FromRgb(217, 152, 34));
-            ConnectionProgress.Visibility = Visibility.Visible;
-            RetryButton.Visibility = Visibility.Collapsed;
-
-            bool isConnected = await _apiService.CheckHealthAsync();
-            if (isConnected)
+            if (!_hasConnected)
             {
-                ConnectionText.Text = "Library server connected";
-                ConnectionIndicator.Fill = new SolidColorBrush(Color.FromRgb(35, 132, 82));
-                ConnectionProgress.Visibility = Visibility.Collapsed;
+                ConnectionText.Text = "Checking library server...";
+                ConnectionIndicator.Fill = new SolidColorBrush(Color.FromRgb(217, 152, 34));
+                ConnectionProgress.Visibility = Visibility.Visible;
                 RetryButton.Visibility = Visibility.Collapsed;
             }
-            else
-            {
-                ConnectionText.Text = "No connection. Reconnecting...";
-                ConnectionIndicator.Fill = new SolidColorBrush(Color.FromRgb(180, 50, 50));
-                ConnectionProgress.Visibility = Visibility.Visible;
-                RetryButton.Visibility = Visibility.Visible;
-            }
 
-            _isChecking = false;
+            try
+            {
+                bool isConnected = await _apiService.CheckHealthAsync();
+                if (isConnected)
+                {
+                    _hasConnected = true;
+                    _consecutiveFailures = 0;
+                    ConnectionText.Text = "Library server connected";
+                    ConnectionIndicator.Fill = new SolidColorBrush(Color.FromRgb(35, 132, 82));
+                    ConnectionProgress.Visibility = Visibility.Collapsed;
+                    RetryButton.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    _consecutiveFailures++;
+                    if (!_hasConnected || _consecutiveFailures >= 3)
+                    {
+                        _hasConnected = false;
+                        ConnectionText.Text = "No connection. Reconnecting...";
+                        ConnectionIndicator.Fill = new SolidColorBrush(Color.FromRgb(180, 50, 50));
+                        ConnectionProgress.Visibility = Visibility.Visible;
+                        RetryButton.Visibility = Visibility.Visible;
+                    }
+                }
+            }
+            finally
+            {
+                _isChecking = false;
+            }
         }
 
         private async void RetryButton_Click(object sender, RoutedEventArgs e)

@@ -21,6 +21,7 @@ namespace PCDSLibrary.Desktop.Views
         private TextBlock _booksCatalogStatus = null!;
         private Button _submitBookButton = null!;
         private Button _cancelBookEditButton = null!;
+        private Expander _bookEditorExpander = null!;
         private bool _isEditingBook;
         private int? _editingBookId;
         private Border _bookDetailsPanel = null!;
@@ -107,6 +108,12 @@ namespace PCDSLibrary.Desktop.Views
                 _pendingUsersTimer.Tick += async (_, _) => await UpdatePendingUsersBadgeAsync();
                 _pendingUsersTimer.Start();
             }
+
+            Closed += (_, _) =>
+            {
+                _pendingRequestsTimer.Stop();
+                _pendingUsersTimer?.Stop();
+            };
         }
 
         private async Task UpdatePendingUsersBadgeAsync()
@@ -115,7 +122,7 @@ namespace PCDSLibrary.Desktop.Views
             if (!result.Success)
                 return;
 
-            var pendingCount = result.Profiles.Count(profile => profile.VerificationStatus == "PENDING_VERIFICATION");
+            var pendingCount = CountProfilesNeedingReview(result.Profiles);
             PendingUsersCountText.Text = pendingCount > 99 ? "99+" : pendingCount.ToString();
             PendingUsersBadge.Visibility = pendingCount > 0 ? Visibility.Visible : Visibility.Collapsed;
             PendingUsersButtonTooltip(pendingCount);
@@ -227,7 +234,8 @@ namespace PCDSLibrary.Desktop.Views
             SetActiveButton(selectedButton);
 
             var content = new StackPanel();
-            content.Children.Add(CreateHeading(title, description));
+            if (title != "Manage Books")
+                content.Children.Add(CreateHeading(title, description));
 
             if (title == "Manage Books")
             {
@@ -852,10 +860,17 @@ namespace PCDSLibrary.Desktop.Views
 
         private void UpdatePendingUsersBadge(IReadOnlyCollection<VerificationProfileData> profiles)
         {
-            var pendingCount = profiles.Count(profile => profile.VerificationStatus == "PENDING_VERIFICATION" || profile.EligibilityStatus == "REVIEW_REQUIRED");
+            var pendingCount = CountProfilesNeedingReview(profiles);
             PendingUsersCountText.Text = pendingCount > 99 ? "99+" : pendingCount.ToString();
             PendingUsersBadge.Visibility = pendingCount > 0 ? Visibility.Visible : Visibility.Collapsed;
             PendingUsersButtonTooltip(pendingCount);
+        }
+
+        private static int CountProfilesNeedingReview(IEnumerable<VerificationProfileData> profiles)
+        {
+            return profiles.Count(profile =>
+                profile.VerificationStatus == "PENDING_VERIFICATION" ||
+                profile.EligibilityStatus == "REVIEW_REQUIRED");
         }
 
         private Border CreateVerificationRow(VerificationProfileData profile, StackPanel list)
@@ -1182,11 +1197,25 @@ namespace PCDSLibrary.Desktop.Views
             if (sender is not Button button || button.Tag is not int requestId)
                 return;
             button.IsEnabled = false;
-            var result = await _apiService.UpdateBorrowRequestAsync(requestId, status);
-            if (!result.Success)
-                MessageBox.Show(result.Message, "Borrow Request", MessageBoxButton.OK, MessageBoxImage.Error);
-            else
+            try
+            {
+                var result = await _apiService.UpdateBorrowRequestAsync(requestId, status);
+                if (!result.Success)
+                {
+                    MessageBox.Show(result.Message, "Borrow Request", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
                 await LoadBorrowRequestsAsync(list);
+            }
+            catch (Exception error)
+            {
+                MessageBox.Show($"Unable to process the borrow request: {error.Message}", "Borrow Request", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                button.IsEnabled = true;
+            }
         }
 
         private static Button CreateRequestButton(string text, string color)
@@ -1235,11 +1264,11 @@ namespace PCDSLibrary.Desktop.Views
 
             form.Children.Add(CreateSettingsSection(
                 "Borrowing policy",
-                "Set the standard loan period for each member type."
+                "Set how long each member type may keep borrowed books."
             ));
-            _studentLoanDaysInput = AddBookField(form, "Student loan period (days)");
+            _studentLoanDaysInput = AddBookField(form, "Student borrowing period (days)");
             _studentLoanDaysInput.Text = settings.StudentLoanDays.ToString();
-            _teacherLoanDaysInput = AddBookField(form, "Teacher loan period (days)");
+            _teacherLoanDaysInput = AddBookField(form, "Teacher borrowing period (days)");
             _teacherLoanDaysInput.Text = settings.TeacherLoanDays.ToString();
             _studentMaxBooksInput = AddBookField(form, "Maximum books per student");
             _studentMaxBooksInput.Text = settings.StudentMaxBooks.ToString();
@@ -1327,7 +1356,7 @@ namespace PCDSLibrary.Desktop.Views
                 !int.TryParse(_teacherMaxBooksInput.Text, out var teacherMaxBooks) || teacherMaxBooks < 1 || teacherMaxBooks > 50 ||
                 !decimal.TryParse(_dailyPenaltyInput.Text, out var dailyPenalty) || dailyPenalty < 0 || dailyPenalty > 100000)
             {
-                MessageBox.Show("Enter valid policy values. Loan periods must be 1-365 days, book limits must be 1-50, and penalty cannot be negative.", "Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Enter valid policy values. Borrowing periods must be 1-365 days, book limits must be 1-50, and penalty cannot be negative.", "Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1359,9 +1388,25 @@ namespace PCDSLibrary.Desktop.Views
         {
             var form = new StackPanel
             {
-                Margin = new Thickness(0, 24, 0, 0),
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
+
+            var pageHeader = new Grid { Margin = new Thickness(0, 0, 0, 22) };
+            pageHeader.ColumnDefinitions.Add(new ColumnDefinition());
+            pageHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            pageHeader.Children.Add(CreateHeading("Books", "Manage the library catalog, inventory, and title information."));
+            var addNewBookButton = CreateSettingsButton("+  Add new book", "#087F8C");
+            addNewBookButton.Height = 44;
+            addNewBookButton.Margin = new Thickness(24, 4, 0, 0);
+            addNewBookButton.Click += (_, _) =>
+            {
+                ResetBookEditor();
+                _bookEditorExpander.IsExpanded = true;
+                _newBookTitleInput.Focus();
+            };
+            Grid.SetColumn(addNewBookButton, 1);
+            pageHeader.Children.Add(addNewBookButton);
+            form.Children.Add(pageHeader);
 
             var createBookContent = new StackPanel();
             createBookContent.Children.Add(CreateSettingsSection(
@@ -1447,31 +1492,50 @@ namespace PCDSLibrary.Desktop.Views
             createBookActions.Children.Add(_newBookStatus);
             createBookContent.Children.Add(createBookActions);
 
-            form.Children.Add(new Border
+            var editorCard = new Border
             {
-                Margin = new Thickness(0, 0, 0, 16),
-                Padding = new Thickness(18),
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F6FAFA")),
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
+                Padding = new Thickness(24),
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D9E6E5")),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(12),
                 Child = createBookContent
-            });
+            };
+            _bookEditorExpander = new Expander
+            {
+                Header = "Book information",
+                IsExpanded = false,
+                Margin = new Thickness(0, 0, 0, 20),
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#102F35")),
+                Content = editorCard
+            };
+            form.Children.Add(_bookEditorExpander);
 
-            _booksCatalogStatus = new TextBlock { Margin = new Thickness(0, 0, 0, 8), FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
-            form.Children.Add(_booksCatalogStatus);
+            var catalogHeader = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+            catalogHeader.ColumnDefinitions.Add(new ColumnDefinition());
+            catalogHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var catalogTitle = new StackPanel();
+            catalogTitle.Children.Add(new TextBlock { Text = "Book catalog", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#102F35")) });
+            _booksCatalogStatus = new TextBlock { Margin = new Thickness(0, 4, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#557177")) };
+            catalogTitle.Children.Add(_booksCatalogStatus);
+            catalogHeader.Children.Add(catalogTitle);
+            form.Children.Add(catalogHeader);
             _booksCatalogGrid = new DataGrid
             {
                 AutoGenerateColumns = false,
                 IsReadOnly = true,
                 CanUserAddRows = false,
                 RowHeaderWidth = 0,
-                RowHeight = 54,
-                ColumnHeaderHeight = 32,
+                RowHeight = 62,
+                ColumnHeaderHeight = 42,
                 FontSize = 13,
-                MaxHeight = 560,
+                MinHeight = 320,
+                MaxHeight = 620,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                Background = Brushes.White
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D9E6E5")),
+                BorderThickness = new Thickness(1)
             };
             var coverThumbnail = new FrameworkElementFactory(typeof(Image));
             coverThumbnail.SetBinding(Image.SourceProperty, new Binding(nameof(BookData.CoverThumbnail)));
@@ -1488,7 +1552,7 @@ namespace PCDSLibrary.Desktop.Views
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Title", Binding = new Binding(nameof(BookData.Title)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Author", Binding = new Binding(nameof(BookData.Author)), Width = new DataGridLength(1.3, DataGridLengthUnitType.Star) });
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Category", Binding = new Binding(nameof(BookData.Category)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-            _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Accession", Binding = new Binding(nameof(BookData.AccessionNumber)), Width = 130 });
+            _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Accession no.", Binding = new Binding(nameof(BookData.AccessionNumber)), Width = 130 });
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Available", Binding = new Binding(nameof(BookData.AvailableCopies)), Width = 80 });
             _booksCatalogGrid.Columns.Add(new DataGridTextColumn { Header = "Total", Binding = new Binding(nameof(BookData.TotalCopies)), Width = 65 });
             _booksCatalogGrid.Columns.Add(CreateBookActionsColumn());
@@ -1506,11 +1570,12 @@ namespace PCDSLibrary.Desktop.Views
             detailsLayout.Children.Add(_bookDetailsContent);
             _bookDetailsPanel = new Border
             {
-                Margin = new Thickness(0, 12, 0, 0),
-                Padding = new Thickness(14),
+                Margin = new Thickness(0, 16, 0, 0),
+                Padding = new Thickness(20),
                 Background = Brushes.White,
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CFE0E1")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D9E6E5")),
                 BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12),
                 Child = detailsLayout,
                 Visibility = Visibility.Collapsed
             };
@@ -1557,6 +1622,7 @@ namespace PCDSLibrary.Desktop.Views
                 return;
 
             _booksCatalogGrid.SelectedItem = book;
+            _bookEditorExpander.IsExpanded = true;
             LoadBookForEditing(book);
         }
 
@@ -1632,6 +1698,7 @@ namespace PCDSLibrary.Desktop.Views
 
         private void ResetBookEditor()
         {
+            _bookEditorExpander.IsExpanded = false;
             _editingBookId = null;
             _isEditingBook = false;
             _newBookTitleInput.Clear();
@@ -2126,7 +2193,7 @@ namespace PCDSLibrary.Desktop.Views
 
             ShowModuleContent(
                 "Settings",
-                "Configure loan periods and penalties.",
+                "Configure borrowing periods and penalties.",
                 "⚙",
                 SettingsButton
             );
