@@ -192,12 +192,12 @@ button { cursor: pointer; }
 
 .add-to-cart-button {
   min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: auto;
-  font-size: 13px;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  margin-top: 0;
+  justify-self: end;
 }
 
 .add-to-cart-button:hover:not(:disabled),
@@ -539,7 +539,7 @@ button { cursor: pointer; }
 
 .book-card-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 44px;
   gap: 8px;
   margin-top: auto;
 }
@@ -738,7 +738,7 @@ button { cursor: pointer; }
   }
 
   .book-card-actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 44px;
   }
 
   .book-details-dialog-body {
@@ -825,6 +825,15 @@ button { cursor: pointer; }
 .catalog-message { border-left-width: 4px; border-radius: 8px; }.manual-request-disclosure .field-grid { gap: 20px; }
 @media (max-width: 700px) { .section-page-heading { padding-bottom: 18px; margin-bottom: 18px; }.catalog-search { height: auto; min-height: 58px; border-radius: 10px; }.catalog-search button { min-height: 42px; }.book-card { min-height: 0; padding: 15px; border-radius: 10px; }.manual-request-disclosure { margin-top: 22px; border-radius: 12px; }.manual-request-heading, .manual-request-disclosure .borrow-request-form { padding: 20px 18px; }.manual-request-heading h3 { font-size: 17px; }.manual-request-disclosure .request-book-button { min-height: 48px; } }
 @media (prefers-reduced-motion: reduce) { .catalog-search, .catalog-search button, .book-card, .request-book-button { transition: none; } }
+
+.book-card-actions .add-to-cart-button {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
 
 /* Institutional PCDS refinement — stronger page structure */
 .dashboard-main { padding: 36px clamp(24px, 3.4vw, 56px) 56px; }
