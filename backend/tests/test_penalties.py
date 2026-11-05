@@ -97,6 +97,35 @@ class PenaltyFlowTest(unittest.TestCase):
         self.assertEqual(response.get_json()["penalty_amount"], 0)
         self.assertIsNone(Penalty.query.filter_by(loan_id=loan.loan_id).first())
 
+    def test_dashboard_totals_exclude_removed_books(self):
+        active_book = Book(
+            title="Active catalog book",
+            author="Test Author",
+            accession_number="ACTIVE-1",
+            total_copies=3,
+            available_copies=2,
+            is_active=True,
+        )
+        removed_book = Book(
+            title="Removed CSV book",
+            author="Test Author",
+            accession_number="PG-1",
+            total_copies=1000,
+            available_copies=1000,
+            is_active=False,
+        )
+        db.session.add_all([active_book, removed_book])
+        db.session.commit()
+
+        response = self.client.get(
+            "/api/library/reports/summary",
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["total_books"], 3)
+        self.assertEqual(response.get_json()["available_books"], 2)
+
     def test_book_records_include_active_and_returned_loans(self):
         active_loan = self.create_loan(-3)
         returned_loan = self.create_loan(2)

@@ -330,8 +330,8 @@ def reports_summary():
     sync_active_overdue_penalties()
     return jsonify({
         "success": True,
-        "total_books": db.session.query(func.coalesce(func.sum(Book.total_copies), 0)).scalar(),
-        "available_books": db.session.query(func.coalesce(func.sum(Book.available_copies), 0)).scalar(),
+        "total_books": db.session.query(func.coalesce(func.sum(Book.total_copies), 0)).filter(Book.is_active.is_(True)).scalar(),
+        "available_books": db.session.query(func.coalesce(func.sum(Book.available_copies), 0)).filter(Book.is_active.is_(True)).scalar(),
         "borrowed_books": Loan.query.filter_by(status="ACTIVE").count(),
         "pending_requests": BorrowRequest.query.filter_by(status="PENDING").count(),
         "approved_requests": BorrowRequest.query.filter_by(status="APPROVED").count(),
