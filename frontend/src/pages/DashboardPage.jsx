@@ -75,7 +75,7 @@ function DashboardPage() {
   }
 
   const navItems = [
-    [LayoutDashboard, 'Dashboard', 'dashboard'], [Search, 'Browse Books', 'books'], [BookOpenCheck, 'My Borrowed Books', 'loans'], [Clock3, 'My Requests', 'requests', summary.pending_requests], [History, 'Borrowing History', 'history'], [Bell, 'Notifications', 'notifications', summary.unread_notifications], [UserRound, 'My Profile', 'profile'],
+    [LayoutDashboard, 'Dashboard', 'dashboard'], [Search, 'Browse Books', 'books'], [Clock3, 'My Requests', 'requests', summary.pending_requests], [History, 'Borrowing History', 'history'], [Bell, 'Notifications', 'notifications', summary.unread_notifications], [UserRound, 'My Profile', 'profile'],
   ]
 
   return (
