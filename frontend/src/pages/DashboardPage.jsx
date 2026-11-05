@@ -12,7 +12,15 @@ const sectionPaths = {
   dashboard: '/dashboard', books: '/books', loans: '/my-loans', dueSoon: '/my-loans', overdue: '/my-loans', requests: '/my-requests',
   history: '/history', notifications: '/notifications', profile: '/profile',
 }
-const pathSections = Object.fromEntries(Object.entries(sectionPaths).map(([section, path]) => [path, section]))
+const pathSections = {
+  '/dashboard': 'dashboard',
+  '/books': 'books',
+  '/my-loans': 'loans',
+  '/my-requests': 'requests',
+  '/history': 'history',
+  '/notifications': 'notifications',
+  '/profile': 'profile',
+}
 
 function DashboardPage() {
   const navigate = useNavigate()
@@ -75,7 +83,7 @@ function DashboardPage() {
   }
 
   const navItems = [
-    [LayoutDashboard, 'Dashboard', 'dashboard'], [Search, 'Browse Books', 'books'], [Clock3, 'My Requests', 'requests', summary.pending_requests], [History, 'Borrowing History', 'history'], [Bell, 'Notifications', 'notifications', summary.unread_notifications], [UserRound, 'My Profile', 'profile'],
+    [LayoutDashboard, 'Dashboard', 'dashboard'], [Search, 'Browse Books', 'books'], [Clock3, 'My Requests', 'requests', summary.pending_requests], [BookOpenCheck, 'My Borrowed Books', 'loans'], [History, 'Borrowing History', 'history'], [Bell, 'Notifications', 'notifications', summary.unread_notifications], [UserRound, 'My Profile', 'profile'],
   ]
 
   return (
@@ -367,6 +375,17 @@ function BrowseBooks({ user, summary, profileVerified, onRequestSubmitted }) {
         const alreadyRequested = requestedBookIds.includes(book.book_id)
         const inCart = cartBooks.some((item) => item.book_id === book.book_id)
         const limitBlocksAddition = cartLimitReached && !inCart
+        const cartButtonLabel = alreadyRequested
+          ? 'Already requested'
+          : inCart
+            ? 'Remove from cart'
+            : unavailable
+              ? 'No copies available'
+              : !profileVerified
+                ? 'Complete profile verification before requesting books'
+                : limitBlocksAddition
+                  ? `Borrowing limit reached (${borrowingLimit})`
+                  : 'Add to cart'
         return <article className="book-card" key={book.book_id}>
           <BookCover book={book} />
           <div className="book-card-details">
@@ -379,8 +398,8 @@ function BrowseBooks({ user, summary, profileVerified, onRequestSubmitted }) {
           </div>
           <div className="book-card-actions">
             <button className="book-details-button" type="button" onClick={() => setSelectedBook(book)}><Eye size={16} aria-hidden="true" /> View details</button>
-            <button className={`request-book-button add-to-cart-button ${inCart ? 'in-cart' : ''}`} type="button" onClick={() => toggleCartBook(book)} disabled={!canRequest || !profileVerified || unavailable || alreadyRequested || cartSubmitting || limitBlocksAddition} title={limitBlocksAddition ? `Borrowing limit reached (${borrowingLimit})` : undefined}>
-              {alreadyRequested ? <><Check size={16} aria-hidden="true" /> Requested</> : inCart ? <><Check size={16} aria-hidden="true" /> In cart</> : limitBlocksAddition ? <>Limit reached</> : <><ShoppingCart size={16} aria-hidden="true" /> Add to cart</>}
+            <button className={`request-book-button add-to-cart-button ${inCart ? 'in-cart' : ''}`} type="button" onClick={() => toggleCartBook(book)} disabled={!canRequest || !profileVerified || unavailable || alreadyRequested || cartSubmitting || limitBlocksAddition} aria-label={cartButtonLabel} title={cartButtonLabel}>
+              {inCart || alreadyRequested ? <Check size={18} aria-hidden="true" /> : <ShoppingCart size={18} aria-hidden="true" />}
             </button>
           </div>
         </article>
@@ -414,7 +433,7 @@ function BrowseBooks({ user, summary, profileVerified, onRequestSubmitted }) {
   </>
 }
 
-function BookCover({ book }) {
+function BookCover({ book, className = '' }) {
   const [coverUrl, setCoverUrl] = useState('')
 
   useEffect(() => {
@@ -437,8 +456,8 @@ function BookCover({ book }) {
     }
   }, [book.book_id, book.cover_image, book.title])
 
-  if (book.cover_image && coverUrl) return <div className="book-card-cover book-card-cover-image"><img src={coverUrl} alt={`Cover of ${book.title} by ${book.author}`} loading="lazy" /></div>
-  return <div className="book-card-cover book-card-cover-image book-card-default-cover">
+  if (book.cover_image && coverUrl) return <div className={`book-card-cover book-card-cover-image ${className}`.trim()}><img src={coverUrl} alt={`Cover of ${book.title} by ${book.author}`} loading="lazy" /></div>
+  return <div className={`book-card-cover book-card-cover-image book-card-default-cover ${className}`.trim()}>
     <img src="/pcds-library-icon.png" alt={`Default PCDS Library cover for ${book.title}`} loading="lazy" />
   </div>
 }
@@ -626,6 +645,12 @@ function LoanItem({ loan }) {
   </div>
 }
 function ReturnedLoanItem({ loan }) {
+  const book = {
+    book_id: loan.book_id,
+    title: loan.book_title,
+    author: loan.book_author || 'Unknown author',
+    cover_image: loan.cover_image,
+  }
   const returnedAt = loan.returned_at ? new Date(loan.returned_at) : null
   const dueDate = loan.due_date ? new Date(loan.due_date) : null
   const hasReturnedDate = returnedAt && !Number.isNaN(returnedAt.getTime())
@@ -643,10 +668,7 @@ function ReturnedLoanItem({ loan }) {
     : 'Returned on time'
 
   return <article className={`book-card returned-book-card ${lateDays > 0 ? 'returned-book-card-late' : ''}`}>
-    <div className="book-card-cover returned-book-cover" aria-hidden="true">
-      <BookOpen size={48} />
-      <span>RETURNED</span>
-    </div>
+    <BookCover book={book} className="returned-book-cover" />
     <div className="book-card-details">
       <h3>{loan.book_title}</h3>
       <p>Returned {returnedDateLabel}</p>
