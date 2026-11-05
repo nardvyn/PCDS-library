@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -7,6 +8,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Microsoft.VisualBasic.FileIO;
 using Microsoft.Win32;
 using PCDSLibrary.Desktop.Models;
 using PCDSLibrary.Desktop.Services;
@@ -19,6 +21,8 @@ namespace PCDSLibrary.Desktop.Views
         private readonly ApiService _apiService;
         private DataGrid _booksCatalogGrid = null!;
         private TextBlock _booksCatalogStatus = null!;
+        private TextBox _booksCatalogSearchInput = null!;
+        private IReadOnlyList<BookData> _booksCatalogItems = Array.Empty<BookData>();
         private Button _submitBookButton = null!;
         private Button _cancelBookEditButton = null!;
         private Expander _bookEditorExpander = null!;
@@ -185,8 +189,8 @@ namespace PCDSLibrary.Desktop.Views
                 Margin = new Thickness(0, 13, 0, 0)
             };
 
-            metrics.Children.Add(CreateMetric("Total Books", "—", "#12363D", value => _totalBooksValue = value));
-            metrics.Children.Add(CreateMetric("Available Books", "—", "#12363D", value => _availableBooksValue = value));
+            metrics.Children.Add(CreateMetric("Total Titles", "—", "#12363D", value => _totalBooksValue = value));
+            metrics.Children.Add(CreateMetric("Available Copies", "—", "#12363D", value => _availableBooksValue = value));
             metrics.Children.Add(CreateMetric("Borrowed Books", "—", "#12363D", value => _borrowedBooksValue = value));
             metrics.Children.Add(CreateMetric("Pending Requests", "—", "#12363D", value => _pendingRequestsValue = value));
             metrics.Children.Add(CreateMetric("Approved Requests", "—", "#12363D", value => _approvedRequestsValue = value));
@@ -213,7 +217,7 @@ namespace PCDSLibrary.Desktop.Views
                 return;
             }
 
-            _totalBooksValue.Text = result.TotalBooks.ToString("N0");
+            _totalBooksValue.Text = result.TotalTitles.ToString("N0");
             _availableBooksValue.Text = result.AvailableBooks.ToString("N0");
             _borrowedBooksValue.Text = result.BorrowedBooks.ToString("N0");
             _pendingRequestsValue.Text = result.PendingRequests.ToString("N0");
@@ -373,17 +377,48 @@ namespace PCDSLibrary.Desktop.Views
             var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
             var list = new StackPanel();
+            var records = new List<LoanData>();
+            var borrowers = new Dictionary<int, BorrowerData>();
+            var search = new TextBox
+            {
+                Height = 40,
+                MinWidth = 240,
+                Margin = new Thickness(0, 0, 8, 0),
+                Padding = new Thickness(12, 8, 12, 8),
+                FontSize = 13,
+                ToolTip = "Search borrower name, school ID, email, contact, course, section, book, or accession number"
+            };
+            AutomationProperties.SetName(search, "Search borrowers and loan records");
+            var clearSearch = CreateSettingsButton("Clear", "#547177");
+            var searchPanel = new DockPanel { Margin = new Thickness(0, 0, 0, 10), LastChildFill = true };
+            DockPanel.SetDock(clearSearch, Dock.Right);
+            searchPanel.Children.Add(clearSearch);
+            searchPanel.Children.Add(search);
             var scroll = new ScrollViewer { Content = list, MaxHeight = 560, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             var refresh = CreateRequestButton("Refresh", "#00899A");
-            refresh.Click += async (_, _) => await LoadLoanListAsync(list, status, overdueOnly, allowReturn);
+            refresh.Click += async (_, _) => await LoadLoanListAsync(list, status, overdueOnly, allowReturn, records, borrowers, search);
+            search.TextChanged += (_, _) => RenderLoanList(list, status, records, borrowers, search.Text, overdueOnly, allowReturn, search);
+            clearSearch.Click += (_, _) =>
+            {
+                search.Clear();
+                search.Focus();
+            };
+            panel.Children.Add(searchPanel);
             panel.Children.Add(refresh);
             panel.Children.Add(status);
             panel.Children.Add(scroll);
-            _ = LoadLoanListAsync(list, status, overdueOnly, allowReturn);
+            _ = LoadLoanListAsync(list, status, overdueOnly, allowReturn, records, borrowers, search);
             return panel;
         }
 
-        private async Task LoadLoanListAsync(StackPanel list, TextBlock status, bool overdueOnly, bool allowReturn)
+        private async Task LoadLoanListAsync(
+            StackPanel list,
+            TextBlock status,
+            bool overdueOnly,
+            bool allowReturn,
+            List<LoanData> records,
+            Dictionary<int, BorrowerData> borrowers,
+            TextBox search)
         {
             status.Text = "Loading loan records...";
             list.Children.Clear();
@@ -394,23 +429,132 @@ namespace PCDSLibrary.Desktop.Views
                 status.Text = result.Message;
                 return;
             }
-            status.Text = $"{result.Loans.Count} record(s)";
-            if (result.Loans.Count == 0)
+            records.Clear();
+            records.AddRange(result.Loans);
+            borrowers.Clear();
+
+            var borrowerResult = await _apiService.GetBorrowersAsync();
+            if (borrowerResult.Success)
             {
-                list.Children.Add(CreateRequestMessage(overdueOnly ? "No overdue books." : "No borrowed books." , "#547177"));
+                foreach (var borrower in borrowerResult.Borrowers)
+                    borrowers[borrower.UserId] = borrower;
+            }
+            RenderLoanList(list, status, records, borrowers, search.Text, overdueOnly, allowReturn, search);
+            if (!borrowerResult.Success)
+                status.Text += $" • Full borrower details unavailable: {borrowerResult.Message}";
+        }
+
+        private void RenderLoanList(
+            StackPanel list,
+            TextBlock status,
+            List<LoanData> records,
+            Dictionary<int, BorrowerData> borrowers,
+            string query,
+            bool overdueOnly,
+            bool allowReturn,
+            TextBox search)
+        {
+            list.Children.Clear();
+            var normalizedQuery = query.Trim();
+            var matches = records.Where(loan =>
+            {
+                borrowers.TryGetValue(loan.UserId, out var borrower);
+                return string.IsNullOrEmpty(normalizedQuery)
+                    || loan.BookTitle.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.BorrowerName.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.SchoolId.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.AccessionNumber.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.Role.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.Status.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || ContainsBorrowerDetail(borrower, normalizedQuery);
+            }).ToList();
+
+            status.Text = matches.Count == 0 && !string.IsNullOrEmpty(normalizedQuery)
+                ? $"No loan records found for \"{normalizedQuery}\"."
+                : string.IsNullOrEmpty(normalizedQuery)
+                    ? $"{records.Count} record(s)"
+                    : $"Showing {matches.Count} of {records.Count} record(s)";
+
+            if (matches.Count == 0)
+            {
+                if (records.Count == 0)
+                    list.Children.Add(CreateRequestMessage(overdueOnly ? "No overdue books." : "No borrowed books.", "#547177"));
                 return;
             }
-            foreach (var loan in result.Loans)
+
+            foreach (var loan in matches)
             {
+                borrowers.TryGetValue(loan.UserId, out var borrower);
+                var borrowerInfo = FormatBorrowerDetails(loan, borrower);
+                var penalty = loan.PenaltyAmount > 0 ? $" • Penalty PHP {loan.PenaltyAmount:0.00}" : "";
+                var loanInfo = $"Due {FormatRequestDate(loan.DueDate)} • Accession {loan.AccessionNumber} • {loan.Status}{(overdueOnly ? $" • {loan.LateDays} late day(s)" : "")}{penalty}";
                 var row = CreateLibraryRow(
                     loan.BookTitle,
-                    $"{loan.BorrowerName} ({loan.SchoolId}) • {loan.Role}",
-                    $"Due {FormatRequestDate(loan.DueDate)} • Accession {loan.AccessionNumber}{(overdueOnly ? $" • {loan.LateDays} late day(s)" : "")}",
+                    borrowerInfo,
+                    loanInfo,
                     allowReturn ? "Process return" : null,
-                    async () => await PromptAndProcessReturnAsync(loan.LoanId, list, status, overdueOnly, allowReturn)
+                    async () => await PromptAndProcessReturnAsync(loan.LoanId, list, status, overdueOnly, allowReturn, records, borrowers, search)
                 );
                 list.Children.Add(row);
             }
+        }
+
+        private static string FormatBorrowerDetails(LoanData loan, BorrowerData? borrower)
+        {
+            var role = FirstAvailable(loan.Role, borrower?.Role);
+            var academicDetails = role == "TEACHER"
+                ? FirstAvailable(borrower?.Department)
+                : string.Join(" • ", new[]
+                {
+                    FirstAvailable(borrower?.Course),
+                    FirstAvailable(borrower?.YearLevel),
+                    FirstAvailable(borrower?.Section)
+                }.Where(value => value != "Not available"));
+
+            return string.Join(Environment.NewLine, new[]
+            {
+                $"{loan.BorrowerName} • {role}",
+                $"School ID: {FirstAvailable(loan.SchoolId, borrower?.SchoolId)} • Email: {FirstAvailable(borrower?.Email)}",
+                $"Contact: {FirstAvailable(borrower?.ContactNumber)} • {(role == "TEACHER" ? "Department" : "Course / year / section")}: {FirstAvailable(academicDetails)}",
+                $"Address: {FirstAvailable(borrower?.Address)}",
+                $"Account: {FirstAvailable(borrower?.AccountStatus)} • Verification: {FirstAvailable(borrower?.VerificationStatus)} • Eligibility: {FirstAvailable(borrower?.EligibilityStatus)}"
+            });
+        }
+
+        private static bool ContainsBorrowerDetail(BorrowerData? borrower, string query) =>
+            borrower != null
+            && (borrower.Email.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || (borrower.ContactNumber?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (borrower.Course?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (borrower.YearLevel?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (borrower.Section?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (borrower.Department?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (borrower.Address?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (borrower.SchoolId?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                || borrower.AccountStatus.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || borrower.VerificationStatus.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || borrower.EligibilityStatus.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+        private static string FirstAvailable(string? value, string? fallback = null) =>
+            !string.IsNullOrWhiteSpace(value) ? value : !string.IsNullOrWhiteSpace(fallback) ? fallback : "Not available";
+
+        private async Task PromptAndProcessReturnAsync(
+            int loanId,
+            StackPanel list,
+            TextBlock status,
+            bool overdueOnly,
+            bool allowReturn,
+            List<LoanData> records,
+            Dictionary<int, BorrowerData> borrowers,
+            TextBox search)
+        {
+            var condition = PromptReturnCondition();
+            if (condition == null)
+                return;
+            var result = await _apiService.ProcessReturnAsync(loanId, condition);
+            MessageBox.Show(result.Message, result.Success ? "Return processed" : "Return failed", MessageBoxButton.OK, result.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
+            if (result.Success)
+                await LoadLoanListAsync(list, status, overdueOnly, allowReturn, records, borrowers, search);
         }
 
         private StackPanel CreateBookRecordsContent()
@@ -418,16 +562,39 @@ namespace PCDSLibrary.Desktop.Views
             var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             var status = new TextBlock { MinHeight = 24, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) };
             var list = new StackPanel();
+            var records = new List<LoanData>();
+            var search = new TextBox
+            {
+                Height = 40,
+                MinWidth = 240,
+                Margin = new Thickness(0, 0, 8, 0),
+                Padding = new Thickness(12, 8, 12, 8),
+                FontSize = 13,
+                ToolTip = "Search borrower, school ID, book title, accession number, role, or status"
+            };
+            AutomationProperties.SetName(search, "Search book records");
+            var clearSearch = CreateSettingsButton("Clear", "#547177");
+            var searchPanel = new DockPanel { Margin = new Thickness(0, 0, 0, 10), LastChildFill = true };
+            DockPanel.SetDock(clearSearch, Dock.Right);
+            searchPanel.Children.Add(clearSearch);
+            searchPanel.Children.Add(search);
             var refresh = CreateRequestButton("Refresh", "#00899A");
-            refresh.Click += async (_, _) => await LoadBookRecordsAsync(list, status);
+            refresh.Click += async (_, _) => await LoadBookRecordsAsync(list, status, records, search);
+            search.TextChanged += (_, _) => RenderBookRecords(list, status, records, search.Text);
+            clearSearch.Click += (_, _) =>
+            {
+                search.Clear();
+                search.Focus();
+            };
+            panel.Children.Add(searchPanel);
             panel.Children.Add(refresh);
             panel.Children.Add(status);
             panel.Children.Add(new ScrollViewer { Content = list, MaxHeight = 560, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
-            _ = LoadBookRecordsAsync(list, status);
+            _ = LoadBookRecordsAsync(list, status, records, search);
             return panel;
         }
 
-        private async Task LoadBookRecordsAsync(StackPanel list, TextBlock status)
+        private async Task LoadBookRecordsAsync(StackPanel list, TextBlock status, List<LoanData> records, TextBox search)
         {
             status.Text = "Loading complete circulation history...";
             list.Children.Clear();
@@ -437,13 +604,40 @@ namespace PCDSLibrary.Desktop.Views
                 status.Text = result.Message;
                 return;
             }
-            status.Text = $"{result.Loans.Count} circulation record(s)";
-            if (result.Loans.Count == 0)
+            records.Clear();
+            records.AddRange(result.Loans);
+            RenderBookRecords(list, status, records, search.Text);
+        }
+
+        private void RenderBookRecords(StackPanel list, TextBlock status, IReadOnlyCollection<LoanData> records, string query)
+        {
+            list.Children.Clear();
+            var normalizedQuery = query.Trim();
+            var matches = string.IsNullOrEmpty(normalizedQuery)
+                ? records.ToList()
+                : records.Where(loan =>
+                    loan.BookTitle.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.BorrowerName.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.SchoolId.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.AccessionNumber.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.Role.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.Status.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                    || loan.PenaltyStatus.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+            status.Text = matches.Count == 0 && !string.IsNullOrEmpty(normalizedQuery)
+                ? $"No book records found for \"{normalizedQuery}\"."
+                : string.IsNullOrEmpty(normalizedQuery)
+                    ? $"{records.Count} circulation record(s)"
+                    : $"Showing {matches.Count} of {records.Count} circulation record(s)";
+
+            if (matches.Count == 0)
             {
-                list.Children.Add(CreateRequestMessage("No book records yet.", "#547177"));
+                if (records.Count == 0)
+                    list.Children.Add(CreateRequestMessage("No book records yet.", "#547177"));
                 return;
             }
-            foreach (var loan in result.Loans)
+            foreach (var loan in matches)
             {
                 var returned = string.IsNullOrWhiteSpace(loan.ReturnedAt) ? "Not returned" : $"Returned {FormatRequestDate(loan.ReturnedAt)}";
                 var penalty = loan.PenaltyAmount > 0 ? $" • Penalty PHP {loan.PenaltyAmount:0.00} ({loan.PenaltyStatus})" : "";
@@ -454,17 +648,6 @@ namespace PCDSLibrary.Desktop.Views
                     null,
                     () => Task.CompletedTask));
             }
-        }
-
-        private async Task PromptAndProcessReturnAsync(int loanId, StackPanel list, TextBlock status, bool overdueOnly, bool allowReturn)
-        {
-            var condition = PromptReturnCondition();
-            if (condition == null)
-                return;
-            var result = await _apiService.ProcessReturnAsync(loanId, condition);
-            MessageBox.Show(result.Message, result.Success ? "Return processed" : "Return failed", MessageBoxButton.OK, result.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
-            if (result.Success)
-                await LoadLoanListAsync(list, status, overdueOnly, allowReturn);
         }
 
         private string? PromptReturnCondition()
@@ -539,9 +722,38 @@ namespace PCDSLibrary.Desktop.Views
             totals.Text = $"Total assessed: PHP {result.TotalPenalties:N2}   •   Unpaid: PHP {result.UnpaidPenalties:N2}   •   Paid: PHP {result.PaidPenalties:N2}";
             status.Text = $"{result.Penalties.Count} penalty record(s)";
             if (result.Penalties.Count == 0) { list.Children.Add(CreateRequestMessage("No penalties recorded.", "#547177")); return; }
+
+            var needsBorrowerLookup = result.Penalties.Any(penalty =>
+                string.IsNullOrWhiteSpace(penalty.BorrowerEmail)
+                || string.IsNullOrWhiteSpace(penalty.BorrowerRole)
+                || (penalty.BorrowerRole == "TEACHER" && string.IsNullOrWhiteSpace(penalty.BorrowerDepartment))
+                || (penalty.BorrowerRole != "TEACHER" && string.IsNullOrWhiteSpace(penalty.BorrowerCourse)));
+            var borrowerLookup = needsBorrowerLookup ? await _apiService.GetBorrowersAsync() : null;
+            var borrowersById = borrowerLookup?.Success == true
+                ? borrowerLookup.Borrowers.ToDictionary(borrower => borrower.UserId)
+                : new Dictionary<int, BorrowerData>();
+
             foreach (var penalty in result.Penalties)
             {
-                var row = CreateLibraryRow(penalty.BookTitle, $"{penalty.BorrowerName} ({penalty.SchoolId}) • {penalty.LateDays} late day(s)", $"PHP {penalty.Amount:0.00} • {penalty.Status} • {FormatRequestDate(penalty.CreatedAt)}", penalty.Status == "UNPAID" ? "Mark paid" : null, async () =>
+                borrowersById.TryGetValue(penalty.UserId, out var borrower);
+                var role = FirstAvailable(penalty.BorrowerRole, borrower?.Role);
+                var academicDetails = role == "TEACHER"
+                    ? FirstAvailable(penalty.BorrowerDepartment, borrower?.Department)
+                    : string.Join(" • ", new[]
+                    {
+                        FirstAvailable(penalty.BorrowerCourse, borrower?.Course),
+                        FirstAvailable(penalty.BorrowerYearLevel, borrower?.YearLevel),
+                        FirstAvailable(penalty.BorrowerSection, borrower?.Section)
+                    }.Where(value => value != "Not available"));
+                var academicLabel = role == "TEACHER" ? "Department" : "Course / year / section";
+                var borrowerDetails = string.Join(Environment.NewLine, new[]
+                {
+                    $"{penalty.BorrowerName} • ID: {FirstAvailable(penalty.SchoolId, borrower?.SchoolId)} • {role}",
+                    $"Email: {FirstAvailable(penalty.BorrowerEmail, borrower?.Email)}",
+                    $"{academicLabel}: {FirstAvailable(academicDetails)}",
+                    $"{penalty.LateDays} late day(s)"
+                });
+                var row = CreateLibraryRow(penalty.BookTitle, borrowerDetails, $"PHP {penalty.Amount:0.00} • {penalty.Status} • {FormatRequestDate(penalty.CreatedAt)}", penalty.Status == "UNPAID" ? "Mark paid" : null, async () =>
                 {
                     var response = await _apiService.MarkPenaltyPaidAsync(penalty.PenaltyId);
                     MessageBox.Show(response.Message, "Penalty payment", MessageBoxButton.OK, response.Success ? MessageBoxImage.Information : MessageBoxImage.Error);
@@ -549,6 +761,8 @@ namespace PCDSLibrary.Desktop.Views
                 });
                 list.Children.Add(row);
             }
+            if (borrowerLookup?.Success == false)
+                status.Text += $" • Borrower details could not be loaded: {borrowerLookup.Message}";
         }
 
         private StackPanel CreateBorrowersContent()
@@ -723,6 +937,7 @@ namespace PCDSLibrary.Desktop.Views
             grid.Children.Clear();
             if (!report.Success) { status.Text = report.Message; return; }
             status.Text = "Current library operations summary";
+            grid.Children.Add(CreateMetric("Total titles", report.TotalTitles.ToString()));
             grid.Children.Add(CreateMetric("Total book copies", report.TotalBooks.ToString()));
             grid.Children.Add(CreateMetric("Available copies", report.AvailableBooks.ToString()));
             grid.Children.Add(CreateMetric("Borrowed books", report.BorrowedBooks.ToString()));
@@ -740,8 +955,8 @@ namespace PCDSLibrary.Desktop.Views
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var details = new StackPanel();
             details.Children.Add(new TextBlock { Text = title, FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D")) });
-            details.Children.Add(new TextBlock { Text = subtitle, Margin = new Thickness(0, 4, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
-            details.Children.Add(new TextBlock { Text = metadata, Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#789094")) });
+            details.Children.Add(new TextBlock { Text = subtitle, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#547177")) });
+            details.Children.Add(new TextBlock { Text = metadata, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0), FontSize = 11, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#789094")) });
             grid.Children.Add(details);
             if (actionLabel != null && action != null)
             {
@@ -1520,7 +1735,55 @@ namespace PCDSLibrary.Desktop.Views
             _booksCatalogStatus = new TextBlock { Margin = new Thickness(0, 4, 0, 0), FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#557177")) };
             catalogTitle.Children.Add(_booksCatalogStatus);
             catalogHeader.Children.Add(catalogTitle);
+            var importActions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var csvTemplateButton = CreateSettingsButton("CSV template", "#176487");
+            csvTemplateButton.Margin = new Thickness(0, 0, 8, 0);
+            csvTemplateButton.Click += (_, _) => SaveBookCsvTemplate();
+            importActions.Children.Add(csvTemplateButton);
+            var importCsvButton = CreateSettingsButton("Import CSV", "#087F8C");
+            importCsvButton.Click += async (_, _) => await ImportBooksCsvAsync(importCsvButton);
+            importActions.Children.Add(importCsvButton);
+            var removeCsvBooksButton = CreateSettingsButton("Remove CSV books", "#B23A3A");
+            removeCsvBooksButton.Margin = new Thickness(8, 0, 0, 0);
+            removeCsvBooksButton.Click += async (_, _) => await RemoveBooksFromCsvAsync(removeCsvBooksButton);
+            importActions.Children.Add(removeCsvBooksButton);
+            Grid.SetColumn(importActions, 1);
+            catalogHeader.Children.Add(importActions);
             form.Children.Add(catalogHeader);
+            var catalogSearchPanel = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+            catalogSearchPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            catalogSearchPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            catalogSearchPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var searchLabel = new TextBlock
+            {
+                Text = "Search books",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 12, 0),
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#12363D"))
+            };
+            catalogSearchPanel.Children.Add(searchLabel);
+            _booksCatalogSearchInput = new TextBox
+            {
+                Height = 40,
+                MinWidth = 240,
+                Padding = new Thickness(12, 8, 12, 8),
+                FontSize = 13,
+                ToolTip = "Search by title, author, category, accession number, call number, or ISBN"
+            };
+            _booksCatalogSearchInput.TextChanged += (_, _) => ApplyBooksCatalogSearch();
+            Grid.SetColumn(_booksCatalogSearchInput, 1);
+            catalogSearchPanel.Children.Add(_booksCatalogSearchInput);
+            var clearSearchButton = CreateSettingsButton("Clear", "#547177");
+            clearSearchButton.Margin = new Thickness(8, 0, 0, 0);
+            clearSearchButton.Click += (_, _) =>
+            {
+                _booksCatalogSearchInput.Clear();
+                _booksCatalogSearchInput.Focus();
+            };
+            Grid.SetColumn(clearSearchButton, 2);
+            catalogSearchPanel.Children.Add(clearSearchButton);
+            form.Children.Add(catalogSearchPanel);
             _booksCatalogGrid = new DataGrid
             {
                 AutoGenerateColumns = false,
@@ -1926,8 +2189,368 @@ namespace PCDSLibrary.Desktop.Views
                 });
                 await Task.WhenAll(thumbnailTasks);
             }
-            _booksCatalogGrid.ItemsSource = result.Success ? result.Books : null;
-            _booksCatalogStatus.Text = result.Success ? $"Book catalog • {result.Books.Count} title(s)" : result.Message;
+            _booksCatalogItems = result.Success ? result.Books : Array.Empty<BookData>();
+            if (!result.Success)
+                _booksCatalogGrid.ItemsSource = null;
+            else
+                ApplyBooksCatalogSearch();
+
+            if (!result.Success)
+                _booksCatalogStatus.Text = result.Message;
+        }
+
+        private void ApplyBooksCatalogSearch()
+        {
+            if (_booksCatalogGrid == null || _booksCatalogSearchInput == null)
+                return;
+
+            var query = _booksCatalogSearchInput.Text.Trim();
+            var matches = string.IsNullOrEmpty(query)
+                ? _booksCatalogItems
+                : _booksCatalogItems.Where(book =>
+                    book.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
+                    || book.Author.Contains(query, StringComparison.OrdinalIgnoreCase)
+                    || (book.Category?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || book.AccessionNumber.Contains(query, StringComparison.OrdinalIgnoreCase)
+                    || (book.CallNumber?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (book.Isbn?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false))
+                    .ToList();
+
+            _booksCatalogGrid.ItemsSource = matches;
+            _booksCatalogGrid.SelectedItem = null;
+            if (_bookDetailsPanel != null)
+                _bookDetailsPanel.Visibility = Visibility.Collapsed;
+
+            _booksCatalogStatus.Text = matches.Count == 0 && !string.IsNullOrEmpty(query)
+                ? $"No books found for \"{query}\"."
+                : string.IsNullOrEmpty(query)
+                    ? $"Book catalog • {_booksCatalogItems.Count} title(s)"
+                    : $"Showing {matches.Count} of {_booksCatalogItems.Count} title(s)";
+        }
+
+        private void SaveBookCsvTemplate()
+        {
+            var picker = new SaveFileDialog
+            {
+                Title = "Save book import CSV template",
+                FileName = "pcds-books-template.csv",
+                Filter = "CSV files (*.csv)|*.csv",
+                DefaultExt = ".csv",
+                AddExtension = true
+            };
+            if (picker.ShowDialog(this) != true)
+                return;
+
+            try
+            {
+                File.WriteAllText(
+                    picker.FileName,
+                    "title,author,accession_number,call_number,isbn,category,publication_year,total_copies,description\r\n",
+                    new UTF8Encoding(true));
+                MessageBox.Show(
+                    "CSV template saved. Title, author, and accession_number are required. Leave optional fields blank when unknown.",
+                    "CSV template",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (IOException error)
+            {
+                MessageBox.Show($"Unable to save the CSV template: {error.Message}", "CSV template", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (UnauthorizedAccessException error)
+            {
+                MessageBox.Show($"Unable to save the CSV template: {error.Message}", "CSV template", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task ImportBooksCsvAsync(Button importButton)
+        {
+            var picker = new OpenFileDialog
+            {
+                Title = "Choose a book catalog CSV file",
+                Filter = "CSV files (*.csv)|*.csv",
+                Multiselect = false
+            };
+            if (picker.ShowDialog(this) != true)
+                return;
+
+            BookCsvImportResult parsed;
+            try
+            {
+                parsed = BookCsvImporter.Parse(picker.FileName);
+            }
+            catch (MalformedLineException error)
+            {
+                MessageBox.Show($"CSV format error on line {error.LineNumber}: {error.Message}", "Import books", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            catch (InvalidDataException error)
+            {
+                MessageBox.Show(error.Message, "Import books", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            catch (IOException error)
+            {
+                MessageBox.Show($"Unable to read the selected CSV file: {error.Message}", "Import books", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            catch (UnauthorizedAccessException error)
+            {
+                MessageBox.Show($"Unable to read the selected CSV file: {error.Message}", "Import books", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var catalog = await _apiService.GetBooksAsync();
+            if (!catalog.Success)
+            {
+                MessageBox.Show($"Could not check the current catalog for duplicates: {catalog.Message}", "Import books", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var existingAccessions = new HashSet<string>(
+                catalog.Books.Select(book => book.AccessionNumber.Trim()),
+                StringComparer.OrdinalIgnoreCase);
+            var existingIsbns = new HashSet<string>(
+                catalog.Books.Select(book => book.Isbn?.Trim()).OfType<string>(),
+                StringComparer.OrdinalIgnoreCase);
+            var importRows = new List<BookCsvRow>();
+            foreach (var row in parsed.Rows)
+            {
+                if (existingAccessions.Contains(row.Request.AccessionNumber) ||
+                    (!string.IsNullOrWhiteSpace(row.Request.Isbn) && existingIsbns.Contains(row.Request.Isbn)))
+                {
+                    parsed.Issues.Add($"Row {row.RowNumber}: accession number or ISBN already exists in the catalog.");
+                    continue;
+                }
+
+                existingAccessions.Add(row.Request.AccessionNumber);
+                if (!string.IsNullOrWhiteSpace(row.Request.Isbn))
+                    existingIsbns.Add(row.Request.Isbn);
+                importRows.Add(row);
+            }
+
+            if (importRows.Count == 0)
+            {
+                var message = parsed.Issues.Count == 0
+                    ? "The CSV does not contain any book rows."
+                    : $"No books are ready to import.\n\n{string.Join(Environment.NewLine, parsed.Issues.Take(10))}";
+                MessageBox.Show(message, "Import books", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var preview = $"Ready to import: {importRows.Count} book(s)\nRows skipped: {parsed.Issues.Count}";
+            if (parsed.Issues.Count > 0)
+                preview += $"\n\n{string.Join(Environment.NewLine, parsed.Issues.Take(8))}";
+            if (parsed.Issues.Count > 8)
+                preview += $"\n…and {parsed.Issues.Count - 8} more skipped row(s).";
+            preview += "\n\nContinue with the valid rows?";
+            if (MessageBox.Show(preview, "Review CSV import", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            importButton.IsEnabled = false;
+            var imported = 0;
+            var completed = 0;
+            var notAttempted = 0;
+            var failedRows = new List<string>();
+            try
+            {
+                foreach (var batch in importRows.Chunk(5))
+                {
+                    _booksCatalogStatus.Text = $"Importing books {completed + 1}-{completed + batch.Length} of {importRows.Count}...";
+                    var outcomes = await Task.WhenAll(batch.Select(async row =>
+                        (Row: row, Response: await _apiService.CreateBookAsync(row.Request))));
+                    var cannotConnect = false;
+                    foreach (var outcome in outcomes)
+                    {
+                        if (outcome.Response.Success)
+                        {
+                            imported++;
+                        }
+                        else
+                        {
+                            failedRows.Add($"Row {outcome.Row.RowNumber}: {outcome.Response.Message}");
+                            cannotConnect |= outcome.Response.Message == "Cannot connect to the Flask server.";
+                        }
+                    }
+                    completed += batch.Length;
+                    if (cannotConnect)
+                    {
+                        notAttempted = importRows.Count - completed;
+                        break;
+                    }
+                }
+
+                if (imported > 0)
+                    await LoadBooksCatalogAsync();
+            }
+            finally
+            {
+                importButton.IsEnabled = true;
+            }
+
+            var summary = $"Imported {imported} of {importRows.Count} ready book(s).";
+            if (parsed.Issues.Count > 0)
+                summary += $"\nSkipped {parsed.Issues.Count} invalid or duplicate row(s).";
+            if (failedRows.Count > 0)
+            {
+                summary += $"\nFailed rows: {failedRows.Count}\n\n{string.Join(Environment.NewLine, failedRows.Take(8))}";
+                if (failedRows.Count > 8)
+                    summary += $"\n…and {failedRows.Count - 8} more failed row(s).";
+            }
+            if (notAttempted > 0)
+                summary += $"\n{notAttempted} book(s) were not attempted because the API connection failed.";
+            MessageBox.Show(
+                summary,
+                "CSV import complete",
+                MessageBoxButton.OK,
+                failedRows.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+
+        private async Task RemoveBooksFromCsvAsync(Button removeButton)
+        {
+            var picker = new OpenFileDialog
+            {
+                Title = "Choose the original Project Gutenberg book import CSV",
+                Filter = "CSV files (*.csv)|*.csv",
+                Multiselect = false
+            };
+            if (picker.ShowDialog(this) != true)
+                return;
+
+            BookCsvImportResult parsed;
+            try
+            {
+                parsed = BookCsvImporter.Parse(picker.FileName);
+            }
+            catch (MalformedLineException error)
+            {
+                MessageBox.Show($"CSV format error on line {error.LineNumber}: {error.Message}", "Remove imported books", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            catch (InvalidDataException error)
+            {
+                MessageBox.Show(error.Message, "Remove imported books", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            catch (IOException error)
+            {
+                MessageBox.Show($"Unable to read the selected CSV file: {error.Message}", "Remove imported books", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            catch (UnauthorizedAccessException error)
+            {
+                MessageBox.Show($"Unable to read the selected CSV file: {error.Message}", "Remove imported books", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            if (parsed.Issues.Count > 0 || parsed.Rows.Count == 0 ||
+                parsed.Rows.Any(row => !row.Request.AccessionNumber.StartsWith("PG-", StringComparison.OrdinalIgnoreCase)))
+            {
+                MessageBox.Show(
+                    "This action only accepts a complete Project Gutenberg CSV with PG- accession numbers. No books were removed.",
+                    "Remove imported books",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            var catalog = await _apiService.GetBooksAsync();
+            if (!catalog.Success)
+            {
+                MessageBox.Show($"Could not load the active catalog: {catalog.Message}", "Remove imported books", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var booksByAccession = catalog.Books
+                .GroupBy(book => book.AccessionNumber.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var matches = new List<(BookCsvRow Row, BookData Book)>();
+            var unmatchedRows = new List<int>();
+            foreach (var row in parsed.Rows)
+            {
+                if (!booksByAccession.TryGetValue(row.Request.AccessionNumber, out var book) ||
+                    !string.Equals(book.Title.Trim(), row.Request.Title, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(book.Author.Trim(), row.Request.Author, StringComparison.OrdinalIgnoreCase))
+                {
+                    unmatchedRows.Add(row.RowNumber);
+                    continue;
+                }
+
+                matches.Add((row, book));
+            }
+
+            if (matches.Count == 0)
+            {
+                MessageBox.Show("No active catalog books exactly matched the CSV accession number, title, and author. No books were removed.", "Remove imported books", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var preview = $"Exact matches to remove from the active catalog: {matches.Count}\nNot found or details differ: {unmatchedRows.Count}\n\n";
+            preview += string.Join(Environment.NewLine, matches.Take(8).Select(match => $"{match.Book.AccessionNumber} — {match.Book.Title}"));
+            if (matches.Count > 8)
+                preview += $"\n…and {matches.Count - 8} more matched book(s).";
+            preview += "\n\nThis removes matching books from the active catalog only; borrowing history is preserved. Books with pending requests may be rejected by the server.";
+            preview += "\n\nContinue?";
+            if (MessageBox.Show(preview, "Confirm CSV book removal", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            removeButton.IsEnabled = false;
+            var removed = 0;
+            var completed = 0;
+            var notAttempted = 0;
+            var failedRows = new List<string>();
+            try
+            {
+                foreach (var batch in matches.Chunk(5))
+                {
+                    _booksCatalogStatus.Text = $"Removing books {completed + 1}-{completed + batch.Length} of {matches.Count}...";
+                    var outcomes = await Task.WhenAll(batch.Select(async match =>
+                        (Match: match, Response: await _apiService.RemoveBookAsync(match.Book.BookId))));
+                    var cannotConnect = false;
+                    foreach (var outcome in outcomes)
+                    {
+                        if (outcome.Response.Success)
+                        {
+                            removed++;
+                        }
+                        else
+                        {
+                            failedRows.Add($"{outcome.Match.Book.AccessionNumber}: {outcome.Response.Message}");
+                            cannotConnect |= outcome.Response.Message == "Cannot connect to the Flask server.";
+                        }
+                    }
+                    completed += batch.Length;
+                    if (cannotConnect)
+                    {
+                        notAttempted = matches.Count - completed;
+                        break;
+                    }
+                }
+
+                if (removed > 0)
+                    await LoadBooksCatalogAsync();
+            }
+            finally
+            {
+                removeButton.IsEnabled = true;
+            }
+
+            var summary = $"Removed {removed} of {matches.Count} matched book(s) from the active catalog.";
+            if (unmatchedRows.Count > 0)
+                summary += $"\nLeft unchanged because they were missing or differed: {unmatchedRows.Count}.";
+            if (failedRows.Count > 0)
+            {
+                summary += $"\nCould not remove: {failedRows.Count}\n\n{string.Join(Environment.NewLine, failedRows.Take(8))}";
+                if (failedRows.Count > 8)
+                    summary += $"\n…and {failedRows.Count - 8} more.";
+            }
+            if (notAttempted > 0)
+                summary += $"\n{notAttempted} book(s) were not attempted because the API connection failed.";
+            MessageBox.Show(
+                summary,
+                "CSV book removal complete",
+                MessageBoxButton.OK,
+                failedRows.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
         private static TextBox AddBookField(StackPanel parent, string label)

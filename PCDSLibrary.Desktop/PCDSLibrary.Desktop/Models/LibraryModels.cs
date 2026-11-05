@@ -47,6 +47,7 @@ namespace PCDSLibrary.Desktop.Models
     public class LoanData
     {
         [JsonPropertyName("loan_id")] public int LoanId { get; set; }
+        [JsonPropertyName("user_id")] public int UserId { get; set; }
         [JsonPropertyName("borrower_name")] public string BorrowerName { get; set; } = "";
         [JsonPropertyName("school_id")] public string SchoolId { get; set; } = "";
         [JsonPropertyName("role")] public string Role { get; set; } = "";
@@ -64,8 +65,15 @@ namespace PCDSLibrary.Desktop.Models
     public class PenaltyData
     {
         [JsonPropertyName("penalty_id")] public int PenaltyId { get; set; }
+        [JsonPropertyName("user_id")] public int UserId { get; set; }
         [JsonPropertyName("borrower_name")] public string BorrowerName { get; set; } = "";
         [JsonPropertyName("school_id")] public string SchoolId { get; set; } = "";
+        [JsonPropertyName("borrower_email")] public string BorrowerEmail { get; set; } = "";
+        [JsonPropertyName("borrower_role")] public string BorrowerRole { get; set; } = "";
+        [JsonPropertyName("borrower_course")] public string BorrowerCourse { get; set; } = "";
+        [JsonPropertyName("borrower_year_level")] public string BorrowerYearLevel { get; set; } = "";
+        [JsonPropertyName("borrower_section")] public string BorrowerSection { get; set; } = "";
+        [JsonPropertyName("borrower_department")] public string BorrowerDepartment { get; set; } = "";
         [JsonPropertyName("book_title")] public string BookTitle { get; set; } = "";
         [JsonPropertyName("amount")] public decimal Amount { get; set; }
         [JsonPropertyName("late_days")] public int LateDays { get; set; }
@@ -104,6 +112,7 @@ namespace PCDSLibrary.Desktop.Models
     {
         [JsonPropertyName("success")] public bool Success { get; set; }
         [JsonPropertyName("message")] public string Message { get; set; } = "";
+        [JsonPropertyName("total_titles")] public int TotalTitles { get; set; }
         [JsonPropertyName("total_books")] public int TotalBooks { get; set; }
         [JsonPropertyName("available_books")] public int AvailableBooks { get; set; }
         [JsonPropertyName("borrowed_books")] public int BorrowedBooks { get; set; }
